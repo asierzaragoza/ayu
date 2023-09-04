@@ -1,0 +1,62 @@
+#!/usr/bin/python3
+
+import argparse
+import os
+import ayu.preprocessing
+import ayu.protein_features
+import ayu.ilr_conversion
+parser = argparse.ArgumentParser()
+parser.add_argument('input_file', help='Fasta file')
+parser.add_argument('out_dir', help='Output directory')
+parser.add_argument('--threads', type=int, default=8, help='number of threads for features that allow multiprocessing (default=8)')
+
+args = parser.parse_args()
+
+args.out_dir = args.out_dir.rstrip('/') + '/'
+if not os.path.isdir(args.out_dir):
+    os.mkdir(args.out_dir)
+
+
+ayu_preproc_fasta = args.out_dir + 'ayu.{}.preproc.faa'.format(os.getpid())
+ayu_preproc_rejected = args.out_dir + 'ayu.{}.preproc_rejected.txt'.format(os.getpid())
+ayu_alias_fasta = args.out_dir + 'ayu.{}.alias.faa'.format(os.getpid())
+ayu_mapping = args.out_dir + 'ayu.{}.alias_mapping.tsv'.format(os.getpid())
+
+ayu.preprocessing.process_fasta_files(args.input_file, ayu_preproc_fasta, ayu_preproc_rejected)
+ayu.preprocessing.give_aliases(ayu_preproc_fasta, ayu_alias_fasta, ayu_mapping)
+
+aa_counts_file = args.out_dir + 'ayu.{}.AA_counts.tsv'.format(os.getpid())
+dp_counts_file = args.out_dir + 'ayu.{}.DP_counts.tsv'.format(os.getpid())
+protein_costs_file = args.out_dir + 'ayu.{}.prot_costs.tsv'.format(os.getpid())
+pqso_file = args.out_dir + 'ayu.{}.pQSO.tsv'.format(os.getpid())
+ppaac_file = args.out_dir + 'ayu.{}.pPAAC.tsv'.format(os.getpid())
+
+print('Extracting protein features (AA Counts)...', end='')
+aa_counts_file = ayu.protein_features.process_aa_counts(ayu_alias_fasta, aa_counts_file, 8)
+print('\tDone!')
+print('Extracting protein features (DP Counts)...', end='')
+dp_counts_file = ayu.protein_features.process_dp_counts(ayu_alias_fasta, dp_counts_file, 8)
+print('\tDone!')
+print('Extracting protein features (Protein costs)...', end='')
+protein_costs_file = ayu.protein_features.process_protein_costs(ayu_alias_fasta, protein_costs_file, 8)
+print('\tDone!')
+print('Extracting protein features (Partial QSO)...', end='')
+pqso_file = ayu.protein_features.process_pqso(ayu_alias_fasta, pqso_file, 8, 20)
+print('\tDone!')
+print('Extracting protein features (Partial PAAC)...', end='')
+ppaac_file = ayu.protein_features.process_ppaac(ayu_alias_fasta, ppaac_file, 8, 20)
+print('\tDone!')
+
+print('Closure + ILR Conversion for AA Counts...', end='')
+aa_ilr_file = ayu.ilr_conversion.process_file_parallel(aa_counts_file, 8)
+print('\tDone!')
+print('Closure + ILR Conversion for DP Counts...', end='')
+dp_ilr_file = ayu.ilr_conversion.process_file_parallel(dp_counts_file, 8)
+print('\tDone!')
+print('Closure + ILR Conversion for partial QSO...', end='')
+pqso_ilr_file = ayu.ilr_conversion.process_file_parallel(pqso_file, 8)
+print('\tDone!')
+print('Closure + ILR Conversion for partial PAAC...', end='')
+ppaac_file = ayu.ilr_conversion.process_file_parallel(ppaac_file, 8)
+print('\tDone!')
+

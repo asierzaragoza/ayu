@@ -1,0 +1,10 @@
+setup.py
+ayu/__init__.py
+ayu/ayu_datafile.py
+ayu/ilr_conversion.py
+ayu/preprocessing.py
+ayu/protein_features.py
+ayu.egg-info/PKG-INFO
+ayu.egg-info/SOURCES.txt
+ayu.egg-info/dependency_links.txt
+ayu.egg-info/top_level.txt
