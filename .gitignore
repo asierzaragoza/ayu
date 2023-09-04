@@ -38,5 +38,5 @@ Thumbs.db
 
 # Folders #
 ###########
-
+*.egg-info/
 testdata/

@@ -6,7 +6,9 @@ import math
 import numpy as np
 import multiprocessing
 
-data_file = '/home/asier/scripts/ayu/data/protein_scales.json'
+
+#todo: Fix this! https://stackoverflow.com/questions/6028000/how-to-read-a-static-file-from-inside-a-python-package
+data_file = '/home/asier/dev/ayu/data/protein_scales.json'
 aa_alphabet = 'ACDEFGHIKLMNPQRSTVWY'
 aaindex_dict = False
 with open(data_file) as in_handle:
