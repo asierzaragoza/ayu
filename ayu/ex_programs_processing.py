@@ -1,5 +1,9 @@
 # This requires the prediction_results.txt file
 import pandas as pd
+import numpy as np
+import itertools
+import scipy.special
+from Bio.SeqIO.FastaIO import SimpleFastaParser
 
 def parse_signalp6_file(infile, outfile):
     out_handle = open(outfile, 'w')
@@ -91,6 +95,50 @@ def get_tmbed_avg_values(tmbed_list, outfile):
             out_handle.write('\t'.join([str(finished_dict[y]) for y in result_header]) + '\n')
     
     return outfile
+
+def add_slr_to_tmbed(tmbed_file, out_file):
+    out_handle = open(out_file, 'w')
+    #Get and store comment lines
+    comment_lines = ''
+    with open(tmbed_file) as in_handle:
+        for line in in_handle:
+            if line[0] == '#':
+                comment_lines += line
+    tmbed_df = pd.read_csv(tmbed_file, sep ='\t', comment='#')
+    tmbed_df['tmbed_slr'] = np.log((tmbed_df['P_B'] + tmbed_df['P_H']) / (tmbed_df['P_S'] + tmbed_df['P_i'] + tmbed_df['P_o']))
+
+    with open(out_file, 'w') as out_handle:
+        out_handle.write(comment_lines)
+    tmbed_df.to_csv(out_file, mode = 'a', sep='\t')
+
+    return out_file
+
+def logit_func(x):
+    x['sp_prob_logit'] = scipy.special.logit(x['sp_prob'])
+    x['none_prob_logit'] = scipy.special.logit(x['none_prob'])
+    return x
+
+def signalp6_probabilities_logit_transform(signalp_file, out_file):
+    signalp_df = pd.read_csv(signalp_file, sep='\t', comment='#')
+    all_values = itertools.chain.from_iterable(signalp_df.drop(columns=['sp_type', 'cs_pos', 'cs_pos_prob', 'prot_ID']).values.tolist())
+    all_values = sorted(list(set(all_values)))
+    epsilon = (all_values[1]) / 2
+    signalp_df['sp_prob'][signalp_df['sp_prob'] == 0] = epsilon
+    signalp_df['sp_prob'][signalp_df['sp_prob'] >= 1] = 1-epsilon
+    signalp_df = signalp_df.apply(logit_func, axis=1)
+    signalp_df.to_csv(out_file, mode = 'a', sep='\t')
+
+    return out_file
+    
+def process_ipc_file(infile, out_handle):
+    with open(infile) as in_handle:
+        for id, seq in SimpleFastaParser(in_handle):
+            new_id = id.split('||')[0]
+            pi_value = float(id.split(':')[-1])
+            out_handle.write('{}\t{}\n'.format(new_id, pi_value))
+        return out_handle
+
+
 
 
 #todo: logit transformation to signalp values

@@ -1,4 +1,5 @@
 import json
+import numpy as np
 
 # From https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2932507/ (Table S1)
 atp_cost = {'A':11.7, 'R':27.3, 'N':14.7, 'D':12.7, 'C':24.7, 
@@ -217,6 +218,26 @@ aa_dict = {'atp_cost':atp_cost,
            'schneider_wrede_dp_dtce': dtce_matrix_schneider_wrede,
            'grantham_dp_dtce': dtce_matrix_grantham,
            }
+
+
+def normalize_aaindex_values(aaindex_dict):
+    """Perform a standard conversion on AA scale dict.
+    :param aaindex_dict: AA scale dict
+    :type aaindex_dict: dict
+    :return: Standardized AA scale dict
+    :rtype: dict
+    """    
+    result = {}
+    mean_aaindex = sum([aaindex_dict[x] for x in aaindex_dict]) / len(aaindex_dict)
+    std_aaindex = np.std([aaindex_dict[x] for x in aaindex_dict])
+    
+    for i in aaindex_dict:
+            result[i] = (aaindex_dict[i] - mean_aaindex) / std_aaindex
+    return result
+
+aa_dict['hydrophobicity_scales'] = normalize_aaindex_values(aa_dict['hydrophobicity_scales'])
+aa_dict['hydrophilicity_scales'] = normalize_aaindex_values(aa_dict['hydrophilicity_scales'])
+aa_dict['residuemass_scales'] = normalize_aaindex_values(aa_dict['residuemass_scales'])
 
 with open('protein_scales.json', 'w') as out_handle:
     out_handle.write(json.dumps(aa_dict))

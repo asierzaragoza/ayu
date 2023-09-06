@@ -50,6 +50,7 @@ print('\tDone!')
 print('Closure + ILR Conversion for AA Counts...', end='')
 aa_ilr_file = ayu.ilr_conversion.process_file_parallel(aa_counts_file, 8)
 print('\tDone!')
+
 print('Closure + ILR Conversion for DP Counts...', end='')
 dp_ilr_file = ayu.ilr_conversion.process_file_parallel(dp_counts_file, 8)
 print('\tDone!')

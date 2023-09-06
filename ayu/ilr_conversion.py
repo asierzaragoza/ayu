@@ -48,7 +48,7 @@ def process_file_parallel(filename, n_threads):
     closure_df.to_csv(out_comp_file, mode = 'a', sep='\t')
 
     closure_columns = None
-    if len(closure_df.columns.values[0].split('_') <= 2):
+    if len(closure_df.columns.values[0].split('_')) <= 2:
         closure_columns = [x.split('_')[0] for x in closure_df.columns.values]
     else:
         closure_columns = ['_'.join(x.split('_')[:-1]) for x in closure_df.columns.values]

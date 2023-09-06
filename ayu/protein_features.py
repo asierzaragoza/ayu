@@ -1,4 +1,5 @@
 from Bio.SeqIO.FastaIO import SimpleFastaParser
+from Bio.SeqUtils.IsoelectricPoint import IsoelectricPoint as IP
 import itertools
 import functools
 import json
@@ -64,20 +65,6 @@ def get_socn_qso(prot_seq, lag):
     tau = tau / (len(prot_seq) - lag)
     return round(tau, 4)
 
-def normalize_aaindex_values(aaindex_dict):
-    """Perform a standard conversion on AA scale dict.
-    :param aaindex_dict: AA scale dict
-    :type aaindex_dict: dict
-    :return: Standardized AA scale dict
-    :rtype: dict
-    """    
-    result = {}
-    mean_aaindex = sum([aaindex_dict[x] for x in aaindex_dict]) / len(aaindex_dict)
-    std_aaindex = np.std([aaindex_dict[x] for x in aaindex_dict])
-    
-    for i in aaindex_dict:
-            result[i] = (aaindex_dict[i] - mean_aaindex) / std_aaindex
-    return result
 
 def get_aa_counts(protseq):
     """Return amino acid counts.
@@ -89,8 +76,10 @@ def get_aa_counts(protseq):
     aa_comp = {k:0 for k in aa_alphabet}
     for item in protseq[1]:
         aa_comp[item] += 1
-    aa_comp['prot_ID'] = protseq[0]
-    return aa_comp
+    
+    new_aa_comp = {'AA_'+ k:v for k, v in aa_comp.items()}
+    new_aa_comp['prot_ID'] = protseq[0]
+    return new_aa_comp
 
 def get_dp_counts(protseq):
     """Return dipeptide counts.
@@ -104,8 +93,9 @@ def get_dp_counts(protseq):
         current = protseq[1][j:j+2]
         if len(current) < 2: continue
         dp_comp[current] += 1
-    dp_comp['prot_ID'] = protseq[0]
-    return dp_comp
+    new_dp_comp = {'DPept_'+ k:v for k, v in dp_comp.items()}
+    new_dp_comp['prot_ID'] = protseq[0]
+    return new_dp_comp
 
 def get_protein_costs(protseq):
     """Calculate protein N/S/C average content, ATP cost and length.
@@ -122,6 +112,18 @@ def get_protein_costs(protseq):
     costs_dict['length'] = len(protseq[1])
 
     return costs_dict
+
+def get_pi_biopython(protseq):
+    """Calculate protein isoelectric point (pI) using Biopython. IPC2 is preferred.
+    :param protseq: tuple(header, sequence), as returned by SimpleFastaParser.
+    :type protseq: tuple
+    :return: dict with protein costs and header (with key = 'prot_ID').
+    :rtype: dict
+    """   
+    pi_dict = {'prot_ID':protseq[0]}
+    pi_dict = {'pI':IP(protseq[1]).pi()}
+
+    return pi_dict
 
 def get_ppaac(prot_seq, max_lag):
     """Calculate partial Pseudo Amino Acid Composition (pPAAC).
@@ -231,5 +233,19 @@ def process_ppaac(input_file, output_file, n_threads, max_lag):
             result_header = list(result.keys())
             out_handle.write('\t'.join(result_header) + '\n')
         out_handle.write('\t'.join([str(result[y]) for y in result_header]) + '\n')   
+    out_handle.close()
+    return output_file
+
+def process_pi(input_file, output_file, n_threads):
+    pool = multiprocessing.Pool(n_threads)
+    in_handle = open(input_file)
+    out_handle = open(output_file, 'w')
+    result_header = None
+
+    for result in pool.imap_unordered(get_pi_biopython, SimpleFastaParser(in_handle)):
+        if result_header is None:
+            result_header = list(result.keys())
+            out_handle.write('\t'.join(result_header) + '\n')
+        out_handle.write('\t'.join([str(result[y]) for y in result_header]) + '\n') 
     out_handle.close()
     return output_file
