@@ -17,7 +17,7 @@ def closure_func_parallel(df):
     return df.apply(closure_func, axis = 1)
 
 def ilr_func_parallel(df):
-    return df.apply(closure_func, axis = 1)
+    return df.apply(ilr_func, axis = 1)
 
 def parallelize_dataframe_apply(df, n_threads, func):
     df_split = np.array_split(df, n_threads)
