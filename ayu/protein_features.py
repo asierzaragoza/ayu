@@ -65,7 +65,6 @@ def get_socn_qso(prot_seq, lag):
     tau = tau / (len(prot_seq) - lag)
     return round(tau, 4)
 
-
 def get_aa_counts(protseq):
     """Return amino acid counts.
     :param protseq: tuple(header, sequence), as returned by SimpleFastaParser.
