@@ -139,6 +139,10 @@ def get_ppaac(prot_seq, max_lag):
     for i in range(1, max_lag + 1):
         tau_list.append(get_coup_factor_paac(prot_seq[1], i))
     total_tau = sum(tau_list)
+    #Sometimes this happens? I still don't know why
+    if total_tau == 0:
+        print('ERROR: protein ID {} has encountered an error in pPAAC calculations'.format(prot_seq[0]))
+        return None
     for i in range(len(tau_list)):
         result_dict['pPseAAC_{}'.format(i+1)] = round(tau_list[i] / total_tau, 4)
     
@@ -159,6 +163,10 @@ def get_pqso(prot_seq, max_lag):
     for i in range(1, max_lag + 1):
         tau_list.append(get_socn_qso(prot_seq[1], i))
     total_tau = sum(tau_list)
+    # Sometimes this happens? I still don't know why
+    if total_tau == 0:
+        print('ERROR: protein ID {} has encountered an error in pQSO calculations'.format(prot_seq[0]))
+        return None
     for i in range(len(tau_list)):
         result_dict['pQSO_{}'.format(i+1)] = round(tau_list[i] / total_tau, 4)
     
@@ -172,8 +180,9 @@ def process_aa_counts(input_file, output_file, n_threads):
     result_header = None
 
     for result in pool.imap_unordered(get_aa_counts, SimpleFastaParser(in_handle)):
+        if result is None: continue
         if result_header is None:
-            result_header = list(result.keys())
+            result_header = sorted(list(result.keys()))
             out_handle.write('\t'.join(result_header) + '\n')
         out_handle.write('\t'.join([str(result[y]) for y in result_header]) + '\n')  
     out_handle.close()
@@ -186,8 +195,9 @@ def process_dp_counts(input_file, output_file, n_threads):
     result_header = None
 
     for result in pool.imap_unordered(get_dp_counts, SimpleFastaParser(in_handle)):
+        if result is None: continue
         if result_header is None:
-            result_header = list(result.keys())
+            result_header = sorted(list(result.keys()))
             out_handle.write('\t'.join(result_header) + '\n')
         out_handle.write('\t'.join([str(result[y]) for y in result_header]) + '\n') 
     out_handle.close()
@@ -200,8 +210,9 @@ def process_protein_costs(input_file, output_file, n_threads):
     result_header = None
 
     for result in pool.imap_unordered(get_protein_costs, SimpleFastaParser(in_handle)):
+        if result is None: continue
         if result_header is None:
-            result_header = list(result.keys())
+            result_header = sorted(list(result.keys()))
             out_handle.write('\t'.join(result_header) + '\n')
         out_handle.write('\t'.join([str(result[y]) for y in result_header]) + '\n') 
     out_handle.close()
@@ -214,8 +225,9 @@ def process_pqso(input_file, output_file, n_threads, max_lag):
     result_header = None
     partial_func_qso = functools.partial(get_pqso, max_lag = max_lag)
     for result in pool.imap_unordered(partial_func_qso, SimpleFastaParser(in_handle)):
+        if result is None: continue
         if result_header is None:
-            result_header = list(result.keys())
+            result_header = sorted(list(result.keys()))
             out_handle.write('\t'.join(result_header) + '\n')
         out_handle.write('\t'.join([str(result[y]) for y in result_header]) + '\n')   
     out_handle.close()
@@ -228,8 +240,9 @@ def process_ppaac(input_file, output_file, n_threads, max_lag):
     result_header = None
     partial_func_paac = functools.partial(get_ppaac, max_lag = max_lag)
     for result in pool.imap_unordered(partial_func_paac, SimpleFastaParser(in_handle)):
+        if result is None: continue
         if result_header is None:
-            result_header = list(result.keys())
+            result_header = sorted(list(result.keys()))
             out_handle.write('\t'.join(result_header) + '\n')
         out_handle.write('\t'.join([str(result[y]) for y in result_header]) + '\n')   
     out_handle.close()
@@ -242,8 +255,9 @@ def process_pi(input_file, output_file, n_threads):
     result_header = None
 
     for result in pool.imap_unordered(get_pi_biopython, SimpleFastaParser(in_handle)):
+        if result is None: continue
         if result_header is None:
-            result_header = list(result.keys())
+            result_header = sorted(list(result.keys()))
             out_handle.write('\t'.join(result_header) + '\n')
         out_handle.write('\t'.join([str(result[y]) for y in result_header]) + '\n') 
     out_handle.close()

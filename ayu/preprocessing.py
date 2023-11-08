@@ -67,3 +67,23 @@ def give_aliases(in_file, out_file, mapping_file):
         for key in mapping_dict:
             out_handle.write('{}\t{}\n'.format(key, mapping_dict[key]))
     return out_file, mapping_file
+
+def divide_fasta_files(file_name, out_file_prefix, max_aa_size = 100000000):
+    n_of_split_files = 0
+    aa_added = 0
+    divided_files_list = []
+    out_filename = out_file_prefix + '__{}.faa'.format(n_of_split_files)
+    out_handle = open(out_filename, 'w')
+    with open(file_name) as in_handle:
+        for id, seq in SimpleFastaParser(in_handle):
+            out_handle.write('>{}\n{}\n'.format(id, seq))
+            aa_added += len(seq)
+            if aa_added >= max_aa_size:
+                out_handle.close()
+                divided_files_list.add(out_filename)
+                n_of_split_files += 1
+                aa_added = 0
+                out_filename = out_file_prefix + '__{}.faa'.format(n_of_split_files)
+                out_handle = open(out_filename, 'w')
+    return divided_files_list
+            

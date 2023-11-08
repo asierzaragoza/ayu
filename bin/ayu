@@ -9,6 +9,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument('input_file', help='Fasta file')
 parser.add_argument('out_dir', help='Output directory')
 parser.add_argument('--threads', type=int, default=8, help='number of threads for features that allow multiprocessing (default=8)')
+parser.add_argument('--run_signalp6')
+parser.add_argument('--run_tmbed')
+parser.add_argument('--signalp_file')
+parser.add_argument('--tmbed_file')
 
 args = parser.parse_args()
 
@@ -19,49 +23,70 @@ if not os.path.isdir(args.out_dir):
 
 ayu_preproc_fasta = args.out_dir + 'ayu.{}.preproc.faa'.format(os.getpid())
 ayu_preproc_rejected = args.out_dir + 'ayu.{}.preproc_rejected.txt'.format(os.getpid())
-ayu_alias_fasta = args.out_dir + 'ayu.{}.alias.faa'.format(os.getpid())
+ayu_alias_fasta_original = args.out_dir + 'ayu.{}.alias.faa'.format(os.getpid())
+ayu_alias_fasta_prefix = args.out_dir + 'ayu.{}.alias'.format(os.getpid())
 ayu_mapping = args.out_dir + 'ayu.{}.alias_mapping.tsv'.format(os.getpid())
 
 ayu.preprocessing.process_fasta_files(args.input_file, ayu_preproc_fasta, ayu_preproc_rejected)
-ayu.preprocessing.give_aliases(ayu_preproc_fasta, ayu_alias_fasta, ayu_mapping)
+ayu.preprocessing.give_aliases(ayu_preproc_fasta, ayu_alias_fasta_original, ayu_mapping)
+ayu_fasta_file_list = ayu.protein_features.divide_fasta_files(ayu_alias_fasta_original, ayu_alias_fasta_prefix)
+os.remove(ayu_alias_fasta_original)
 
-aa_counts_file = args.out_dir + 'ayu.{}.AA_counts.tsv'.format(os.getpid())
-dp_counts_file = args.out_dir + 'ayu.{}.DP_counts.tsv'.format(os.getpid())
-protein_costs_file = args.out_dir + 'ayu.{}.prot_costs.tsv'.format(os.getpid())
-pqso_file = args.out_dir + 'ayu.{}.pQSO.tsv'.format(os.getpid())
-ppaac_file = args.out_dir + 'ayu.{}.pPAAC.tsv'.format(os.getpid())
+for ayu_fasta_file in ayu_fasta_file_list:
+    ayu_file_prefix = '.'.join(ayu_fasta_file.split('.')[:-1])
+    
+    aa_counts_file = ayu_file_prefix + '.AA_counts.tsv'
+    print('Extracting protein features (AA Counts)...', end='')
+    aa_counts_file = ayu.protein_features.process_aa_counts(ayu_fasta_file, aa_counts_file, args.threads)
+    print('\tDone!')
+    print('Closure + ILR Conversion for AA Counts...', end='')
+    aa_closure_file = aa_counts_file + '.CL'
+    aa_closure_file = ayu.ilr_conversion.process_file_parallel_closure(aa_counts_file, aa_closure_file, args.threads)
+    aa_ilr_file = aa_closure_file + '.ILR'
+    aa_ilr_file = ayu.ilr_conversion.process_file_parallel_ilr(aa_closure_file, aa_ilr_file, args.threads)
+    os.remove(aa_counts_file, aa_closure_file)
+    print('\tDone!')
+    
+    dp_counts_file = ayu_file_prefix + '.DP_counts.tsv'
+    print('Extracting protein features (DP Counts)...', end='')
+    dp_counts_file = ayu.protein_features.process_dp_counts(ayu_fasta_file, dp_counts_file, args.threads)
+    print('\tDone!')
+    print('Closure + ILR Conversion for DP Counts...', end='')
+    dp_closure_file = dp_counts_file + '.CL'
+    dp_comp_file = ayu.ilr_conversion.process_file_parallel_closure(dp_counts_file, dp_closure_file, args.threads)
+    dp_ilr_file = dp_closure_file + '.ILR'
+    dp_ilr_file = ayu.ilr_conversion.process_file_parallel_ilr(dp_closure_file, dp_ilr_file, args.threads)
+    os.remove(dp_counts_file, dp_closure_file)
+    print('\tDone!')
 
-print('Extracting protein features (AA Counts)...', end='')
-aa_counts_file = ayu.protein_features.process_aa_counts(ayu_alias_fasta, aa_counts_file, args.threads)
-print('\tDone!')
-print('Extracting protein features (DP Counts)...', end='')
-dp_counts_file = ayu.protein_features.process_dp_counts(ayu_alias_fasta, dp_counts_file, args.threads)
-print('\tDone!')
-print('Extracting protein features (Protein costs)...', end='')
-protein_costs_file = ayu.protein_features.process_protein_costs(ayu_alias_fasta, protein_costs_file, args.threads)
-print('\tDone!')
-print('Extracting protein features (Partial QSO)...', end='')
-pqso_file = ayu.protein_features.process_pqso(ayu_alias_fasta, pqso_file, args.threads, 20)
-print('\tDone!')
-print('Extracting protein features (Partial PAAC)...', end='')
-ppaac_file = ayu.protein_features.process_ppaac(ayu_alias_fasta, ppaac_file, args.threads, 20)
-print('\tDone!')
-print('Closure + ILR Conversion for AA Counts...', end='')
-aa_closure_file = ayu.ilr_conversion.process_file_parallel2_closure(aa_counts_file, args.threads)
-aa_ilr_file = ayu.ilr_conversion.process_file_parallel2_ilr(aa_closure_file, args.threads)
-print('\tDone!')
-print('Closure + ILR Conversion for DP Counts...', end='')
-dp_comp_file = ayu.ilr_conversion.process_file_parallel2_closure(dp_counts_file, args.threads)
-dp_ilr_file = ayu.ilr_conversion.process_file_parallel2_ilr(dp_comp_file, args.threads)
-print('\tDone!')
-print('Closure + ILR Conversion for partial QSO...', end='')
-pqso_comp_file = ayu.ilr_conversion.process_file_parallel2_closure(pqso_file, args.threads)
-pqso_ilr_file = ayu.ilr_conversion.process_file_parallel2_ilr(pqso_comp_file, args.threads)
-print('\tDone!')
-print('Closure + ILR Conversion for partial PAAC...', end='')
-ppaac_comp_file = ayu.ilr_conversion.process_file_parallel2_closure(ppaac_file, args.threads)
-ppaac_ilr_file = ayu.ilr_conversion.process_file_parallel2_ilr(ppaac_comp_file, args.threads)
-print('\tDone!')
+    protein_costs_file = ayu_file_prefix + '.prot_costs.tsv'
+    print('Extracting protein features (Protein costs)...', end='')
+    protein_costs_file = ayu.protein_features.process_protein_costs(ayu_fasta_file, protein_costs_file, args.threads)
+    print('\tDone!')
+
+    pqso_file = ayu_file_prefix + '.pQSO.tsv'
+    print('Extracting protein features (Partial QSO)...', end='')
+    pqso_file = ayu.protein_features.process_pqso(ayu_fasta_file, pqso_file, args.threads, 20)
+    print('\tDone!')
+    print('Closure + ILR Conversion for partial QSO...', end='')
+    pqso_closure_file = pqso_file + '.CL'
+    pqso_closure_file = ayu.ilr_conversion.process_file_parallel2_closure(pqso_file, pqso_closure_file, args.threads)
+    pqso_ilr_file = pqso_closure_file + '.ILR'
+    pqso_ilr_file = ayu.ilr_conversion.process_file_parallel2_ilr(pqso_closure_file, pqso_ilr_file, args.threads)
+    os.remove(pqso_file, pqso_closure_file)
+    print('\tDone!')
+
+    ppaac_file = ayu_file_prefix + '.pPAAC.tsv'
+    print('Extracting protein features (Partial PAAC)...', end='')
+    ppaac_file = ayu.protein_features.process_ppaac(ayu_fasta_file, ppaac_file, args.threads, 20)
+    print('\tDone!')
+    print('Closure + ILR Conversion for partial PAAC...', end='')
+    ppaac_closure_file = ppaac_file + '.CL'
+    ppaac_closure_file = ayu.ilr_conversion.process_file_parallel2_closure(ppaac_file, ppaac_closure_file, args.threads)
+    ppaac_ilr_file = ppaac_closure_file + '.ILR'
+    ppaac_ilr_file = ayu.ilr_conversion.process_file_parallel2_ilr(ppaac_closure_file, ppaac_ilr_file, args.threads)
+    os.remove(ppaac_file, ppaac_closure_file)
+    print('\tDone!')
 
 
 
