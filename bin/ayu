@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import pickle
 import ayu.preprocessing
 import ayu.protein_features
 import ayu.ilr_conversion
@@ -15,78 +16,156 @@ parser.add_argument('--signalp_file')
 parser.add_argument('--tmbed_file')
 
 args = parser.parse_args()
-
 args.out_dir = args.out_dir.rstrip('/') + '/'
+
+def save_ayu_progress(progress_file, progress_status_dict):
+    with open(progress_file, 'wb') as out_handle:
+        pickle.dump(progress_status_dict, out_handle)
+
+def remove_file(*files_to_remove):
+    for filename in files_to_remove:
+        try:
+            os.remove(filename)
+        except FileNotFoundError:
+            pass
+
+progress_status_file = None
 if not os.path.isdir(args.out_dir):
     os.mkdir(args.out_dir)
+else:
+    ayu_file_list = [x for x in os.listdir(args.out_dir) if x.split('.')[-1] == 'ayu']
+    if len(ayu_file_list) == 1:
+        progress_status_file = ayu_file_list[0]
 
+progress_status_dict = {'prefilter':None,
+                       'alias_fasta':None,
+                       'alias_mapping':None,
+                       'final_fasta_files':{}
+                       }
 
-ayu_preproc_fasta = args.out_dir + 'ayu.{}.preproc.faa'.format(os.getpid())
-ayu_preproc_rejected = args.out_dir + 'ayu.{}.preproc_rejected.txt'.format(os.getpid())
-ayu_alias_fasta_original = args.out_dir + 'ayu.{}.alias.faa'.format(os.getpid())
-ayu_alias_fasta_prefix = args.out_dir + 'ayu.{}.alias'.format(os.getpid())
-ayu_mapping = args.out_dir + 'ayu.{}.alias_mapping.tsv'.format(os.getpid())
+if progress_status_file is None:
+    progress_status_file = args.out_dir + 'ayu.{}.status.ayu'.format(os.getpid())
+    save_ayu_progress(progress_status_file, progress_status_dict)
+else:
+    with open(progress_status_file, 'rb') as in_handle:
+        progress_status_dict = pickle.load(in_handle)
 
-ayu.preprocessing.process_fasta_files(args.input_file, ayu_preproc_fasta, ayu_preproc_rejected)
-ayu.preprocessing.give_aliases(ayu_preproc_fasta, ayu_alias_fasta_original, ayu_mapping)
-ayu_fasta_file_list = ayu.protein_features.divide_fasta_files(ayu_alias_fasta_original, ayu_alias_fasta_prefix)
-os.remove(ayu_alias_fasta_original)
+if progress_status_dict['prefilter'] is None:
+    print('Preprocessing files...',end='')
+    ayu_preproc_fasta = args.out_dir + 'ayu.{}.preproc.faa'.format(os.getpid())
+    ayu_preproc_rejected = args.out_dir + 'ayu.{}.preproc_rejected.txt'.format(os.getpid())
+    progress_status_dict['prefilter'] = ayu.preprocessing.process_fasta_files(args.input_file, ayu_preproc_fasta, ayu_preproc_rejected)
+else:
+    print('Loaded previous preprocessing')
 
-for ayu_fasta_file in ayu_fasta_file_list:
+if progress_status_dict['alias_mapping'] is None:
+    print('Processing aliases...', end='')
+    ayu_alias_fasta_original = args.out_dir + 'ayu.{}.alias.faa'.format(os.getpid())
+    ayu_mapping = args.out_dir + 'ayu.{}.alias_mapping.tsv'.format(os.getpid())
+    progress_status_dict['alias_fasta'], progress_status_dict['alias_mapping'] = ayu.preprocessing.give_aliases(
+        progress_status_dict['prefilter'], ayu_alias_fasta_original, ayu_mapping)
+    print(' finished!')
+else:
+    print('Loaded previous aliases')
+
+if progress_status_dict['final_fasta_files'] is None:
+    print('Dividing files into chunks...', end='')
+    ayu_alias_fasta_prefix = args.out_dir + 'ayu.{}.alias'.format(os.getpid())
+    ayu_fasta_file_list = ayu.preprocessing.divide_fasta_files(progress_status_dict['alias_fasta'], ayu_alias_fasta_prefix)
+    print('file divided into {} chunks'.format(len(ayu_fasta_file_list)))
+    for file_name in ayu_fasta_file_list:
+        progress_status_dict['final_fasta_files'][file_name] = {'aa_counts':None,
+                                                               'aa_counts_ilr':None,
+                                                               'dp_counts':None,
+                                                               'dp_counts_ilr':None,
+                                                               'protein_costs':None,
+                                                               'pqso':None,
+                                                               'pqso_ilr':None,
+                                                               'ppaac':None,
+                                                               'ppaac_ilr':None,
+                                                               'tmbed':None,
+                                                               'sp':None
+                                                               }
+    remove_file(progress_status_dict['alias_fasta'])
+else:
+    print('Loaded previous chunks')
+
+for ayu_fasta_file in progress_status_dict['final_fasta_files']:
+    print('processing fasta file {}...'.format(ayu_fasta_file))
     ayu_file_prefix = '.'.join(ayu_fasta_file.split('.')[:-1])
     
-    aa_counts_file = ayu_file_prefix + '.AA_counts.tsv'
-    print('Extracting protein features (AA Counts)...', end='')
-    aa_counts_file = ayu.protein_features.process_aa_counts(ayu_fasta_file, aa_counts_file, args.threads)
-    print('\tDone!')
-    print('Closure + ILR Conversion for AA Counts...', end='')
-    aa_closure_file = aa_counts_file + '.CL'
-    aa_closure_file = ayu.ilr_conversion.process_file_parallel_closure(aa_counts_file, aa_closure_file, args.threads)
-    aa_ilr_file = aa_closure_file + '.ILR'
-    aa_ilr_file = ayu.ilr_conversion.process_file_parallel_ilr(aa_closure_file, aa_ilr_file, args.threads)
-    os.remove(aa_counts_file, aa_closure_file)
-    print('\tDone!')
+    if progress_status_dict['final_fasta_files'][ayu_fasta_file]['aa_counts'] is None:
+        aa_counts_file = ayu_file_prefix + '.AA_counts.tsv'
+        print('Extracting protein features (AA Counts)... ', end='')
+        progress_status_dict['final_fasta_files'][ayu_fasta_file]['aa_counts'] = ayu.protein_features.process_aa_counts(ayu_fasta_file, 
+            aa_counts_file, args.threads)
+        print('\tDone!')
+    if progress_status_dict['final_fasta_files'][ayu_fasta_file]['aa_counts_ilr'] is None:
+        print('Closure + ILR Conversion for AA Counts...', end='')
+        aa_closure_file = progress_status_dict['final_fasta_files'][ayu_fasta_file]['aa_counts'] + '.CL'
+        aa_closure_file = ayu.ilr_conversion.process_file_parallel_closure(progress_status_dict['final_fasta_files'][ayu_fasta_file]['aa_counts'], 
+                                                                           aa_closure_file, args.threads)
+        aa_ilr_file = aa_closure_file + '.ILR'
+        progress_status_dict['final_fasta_files'][ayu_fasta_file]['aa_counts_ilr'] = ayu.ilr_conversion.process_file_parallel_ilr(aa_closure_file, aa_ilr_file, args.threads)
+        remove_file(progress_status_dict['final_fasta_files'][ayu_fasta_file]['aa_counts'], aa_closure_file)
+        print('\tDone!')
     
-    dp_counts_file = ayu_file_prefix + '.DP_counts.tsv'
-    print('Extracting protein features (DP Counts)...', end='')
-    dp_counts_file = ayu.protein_features.process_dp_counts(ayu_fasta_file, dp_counts_file, args.threads)
-    print('\tDone!')
-    print('Closure + ILR Conversion for DP Counts...', end='')
-    dp_closure_file = dp_counts_file + '.CL'
-    dp_comp_file = ayu.ilr_conversion.process_file_parallel_closure(dp_counts_file, dp_closure_file, args.threads)
-    dp_ilr_file = dp_closure_file + '.ILR'
-    dp_ilr_file = ayu.ilr_conversion.process_file_parallel_ilr(dp_closure_file, dp_ilr_file, args.threads)
-    os.remove(dp_counts_file, dp_closure_file)
-    print('\tDone!')
+    if progress_status_dict['final_fasta_files'][ayu_fasta_file]['dp_counts'] is None:
+        dp_counts_file = ayu_file_prefix + '.DP_counts.tsv'
+        print('Extracting protein features (DP Counts)...', end='')
+        progress_status_dict['final_fasta_files'][ayu_fasta_file]['dp_counts'] = ayu.protein_features.process_dp_counts(ayu_fasta_file, 
+            dp_counts_file, args.threads)
+        print('\tDone!')
+    if progress_status_dict['final_fasta_files'][ayu_fasta_file]['dp_counts_ilr'] is None:
+        print('Closure + ILR Conversion for DP Counts...', end='')
+        dp_closure_file = progress_status_dict['final_fasta_files'][ayu_fasta_file]['dp_counts'] + '.CL'
+        dp_comp_file = ayu.ilr_conversion.process_file_parallel_closure(progress_status_dict['final_fasta_files'][ayu_fasta_file]['dp_counts'], 
+                                                                        dp_closure_file, args.threads)
+        dp_ilr_file = dp_closure_file + '.ILR'
+        progress_status_dict['final_fasta_files'][ayu_fasta_file]['dp_counts_ilr'] = ayu.ilr_conversion.process_file_parallel_ilr(dp_closure_file, dp_ilr_file, args.threads)
+        remove_file(progress_status_dict['final_fasta_files'][ayu_fasta_file]['dp_counts'], dp_closure_file)
+        print('\tDone!')
 
-    protein_costs_file = ayu_file_prefix + '.prot_costs.tsv'
-    print('Extracting protein features (Protein costs)...', end='')
-    protein_costs_file = ayu.protein_features.process_protein_costs(ayu_fasta_file, protein_costs_file, args.threads)
-    print('\tDone!')
+    if progress_status_dict['final_fasta_files'][ayu_fasta_file]['protein_costs'] is None:
+        protein_costs_file = ayu_file_prefix + '.prot_costs.tsv'
+        print('Extracting protein features (Protein costs)...', end='')
+        progress_status_dict['final_fasta_files'][ayu_fasta_file]['protein_costs'] = ayu.protein_features.process_protein_costs(ayu_fasta_file, protein_costs_file, args.threads)
+        print('\tDone!')
 
-    pqso_file = ayu_file_prefix + '.pQSO.tsv'
-    print('Extracting protein features (Partial QSO)...', end='')
-    pqso_file = ayu.protein_features.process_pqso(ayu_fasta_file, pqso_file, args.threads, 20)
-    print('\tDone!')
-    print('Closure + ILR Conversion for partial QSO...', end='')
-    pqso_closure_file = pqso_file + '.CL'
-    pqso_closure_file = ayu.ilr_conversion.process_file_parallel2_closure(pqso_file, pqso_closure_file, args.threads)
-    pqso_ilr_file = pqso_closure_file + '.ILR'
-    pqso_ilr_file = ayu.ilr_conversion.process_file_parallel2_ilr(pqso_closure_file, pqso_ilr_file, args.threads)
-    os.remove(pqso_file, pqso_closure_file)
-    print('\tDone!')
+    if progress_status_dict['final_fasta_files'][ayu_fasta_file]['pqso'] is None:
+        pqso_file = ayu_file_prefix + '.pQSO.tsv'
+        print('Extracting protein features (Partial QSO)...', end='')
+        progress_status_dict['final_fasta_files'][ayu_fasta_file]['pqso'] = ayu.protein_features.process_pqso(ayu_fasta_file, pqso_file, args.threads, 20)
+        print('\tDone!')
+    
+    if progress_status_dict['final_fasta_files'][ayu_fasta_file]['pqso_ilr'] is None:
+        print('Closure + ILR Conversion for partial QSO...', end='')
+        pqso_closure_file = progress_status_dict['final_fasta_files'][ayu_fasta_file]['pqso'] + '.CL'
+        pqso_closure_file = ayu.ilr_conversion.process_file_parallel2_closure(progress_status_dict['final_fasta_files'][ayu_fasta_file]['pqso'], 
+                                                                              pqso_closure_file, args.threads)
+        pqso_ilr_file = pqso_closure_file + '.ILR'
+        progress_status_dict['final_fasta_files'][ayu_fasta_file]['pqso_ilr'] = ayu.ilr_conversion.process_file_parallel2_ilr(pqso_closure_file, 
+                                                                                pqso_ilr_file, args.threads)
+        remove_file(progress_status_dict['final_fasta_files'][ayu_fasta_file]['pqso'], pqso_closure_file)
+        print('\tDone!')
 
-    ppaac_file = ayu_file_prefix + '.pPAAC.tsv'
-    print('Extracting protein features (Partial PAAC)...', end='')
-    ppaac_file = ayu.protein_features.process_ppaac(ayu_fasta_file, ppaac_file, args.threads, 20)
-    print('\tDone!')
-    print('Closure + ILR Conversion for partial PAAC...', end='')
-    ppaac_closure_file = ppaac_file + '.CL'
-    ppaac_closure_file = ayu.ilr_conversion.process_file_parallel2_closure(ppaac_file, ppaac_closure_file, args.threads)
-    ppaac_ilr_file = ppaac_closure_file + '.ILR'
-    ppaac_ilr_file = ayu.ilr_conversion.process_file_parallel2_ilr(ppaac_closure_file, ppaac_ilr_file, args.threads)
-    os.remove(ppaac_file, ppaac_closure_file)
-    print('\tDone!')
+    if progress_status_dict['final_fasta_files'][ayu_fasta_file]['ppaac'] is None:
+        ppaac_file = ayu_file_prefix + '.pPAAC.tsv'
+        print('Extracting protein features (Partial PAAC)...', end='')
+        progress_status_dict['final_fasta_files'][ayu_fasta_file]['ppaac'] = ayu.protein_features.process_ppaac(progress_status_dict['final_fasta_files'][ayu_fasta_file], ppaac_file, args.threads, 20)
+        print('\tDone!')
+
+    if progress_status_dict['final_fasta_files'][ayu_fasta_file]['ppaac_ilr'] is None:
+        print('Closure + ILR Conversion for partial PAAC...', end='')
+        ppaac_closure_file = progress_status_dict['final_fasta_files'][ayu_fasta_file]['ppaac'] + '.CL'
+        ppaac_closure_file = ayu.ilr_conversion.process_file_parallel2_closure(progress_status_dict['final_fasta_files'][ayu_fasta_file]['ppaac'],
+                                                                            ppaac_closure_file, args.threads)
+        ppaac_ilr_file = ppaac_closure_file + '.ILR'
+        progress_status_dict['final_fasta_files'][ayu_fasta_file]['ppaac_ilr'] = ayu.ilr_conversion.process_file_parallel2_ilr(ppaac_closure_file, ppaac_ilr_file, args.threads)
+        remove_file(ppaac_file, ppaac_closure_file)
+        print('\tDone!')
+
+    
 
 
 

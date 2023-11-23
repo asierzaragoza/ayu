@@ -34,7 +34,7 @@ def process_fasta_files(file_name, out_file, rejected_file):
             out_handle.write('>{}\n{}\n'.format(id, seq))
     out_handle.close()
 
-    print('Preprocessing finished.')
+    print(' finished!')
     if len(small_prots_set) + len(nonstd_prots_set) + len(duplicated_prots_list) > 0 :
         print('\t{} sequences are too small (<50 aa) and have been removed from further analyses.'.format(len(small_prots_set)))
         print('\t{} sequences contain nonstandard aa and have been removed from further analyses.'.format(len(nonstd_prots_set)))
@@ -86,4 +86,6 @@ def divide_fasta_files(file_name, out_file_prefix, max_aa_size = 100000000):
                 out_filename = out_file_prefix + '__{}.faa'.format(n_of_split_files)
                 out_handle = open(out_filename, 'w')
     return divided_files_list
-            
+
+def merge_dfs(df_list):
+    pass
