@@ -80,12 +80,27 @@ def divide_fasta_files(file_name, out_file_prefix, max_aa_size = 100000000):
             aa_added += len(seq)
             if aa_added >= max_aa_size:
                 out_handle.close()
-                divided_files_list.add(out_filename)
+                divided_files_list.append(out_filename)
                 n_of_split_files += 1
                 aa_added = 0
                 out_filename = out_file_prefix + '__{}.faa'.format(n_of_split_files)
                 out_handle = open(out_filename, 'w')
+    out_handle.close()
+    divided_files_list.append(out_filename)
+    n_of_split_files += 1
+    
     return divided_files_list
+
+
+
+def check_tmbed_completeness():
+    pass
+
+def check_signalp_completeness():
+    pass
+
+def check_ipc2_completeness():
+    pass
 
 def merge_dfs(df_list):
     pass

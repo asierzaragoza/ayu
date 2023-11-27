@@ -1,5 +1,7 @@
 from Bio.SeqIO.FastaIO import SimpleFastaParser
 from Bio.SeqUtils.IsoelectricPoint import IsoelectricPoint as IP
+
+import pkgutil
 import itertools
 import functools
 import json
@@ -9,11 +11,10 @@ import multiprocessing
 
 
 #todo: Fix this! https://stackoverflow.com/questions/6028000/how-to-read-a-static-file-from-inside-a-python-package
-data_file = '/home/asier/dev/ayu/data/protein_scales.json'
+
+data_file = pkgutil.get_data(__name__, 'data/protein_scales.json')
 aa_alphabet = 'ACDEFGHIKLMNPQRSTVWY'
-aaindex_dict = False
-with open(data_file) as in_handle:
-    aaindex_dict = json.loads(in_handle.read())
+aaindex_dict = json.loads(data_file)
 
 # AUXILIARY FUNCTIONS
 def calculate_substitution(sequence, aascales_dict):
