@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import os
 import itertools
+import subprocess
 import pickle
 import scipy.special
 import skbio.stats.composition as skbio_comp
@@ -10,6 +11,14 @@ import ayu.preprocessing
 from Bio.SeqIO.FastaIO import SimpleFastaParser
 
 #TMBed
+def is_tmbed_in_path():
+    devnull = open(os.devnull, 'w')
+    proc = subprocess.run(['bash', '-c', 'type tmbed'], stdout=devnull, stderr=devnull)
+    if proc.returncode == 0:
+        return True
+    else:
+        return False
+
 def parse_tmbed_file(tmbed_file):
     '''PRD: Predicted type, the other keys are the prediction values for each type'''
     tmbed_master_list = []
@@ -82,6 +91,14 @@ def process_tmbed_file(tmbed_file, ayu_outdir, keep_files = False):
 
 
 #SignalP6
+def is_signalp_in_path():
+    devnull = open(os.devnull, 'w')
+    proc = subprocess.run(['bash', '-c', 'type signalp6'], stdout=devnull, stderr=devnull)
+    if proc.returncode == 0:
+        return True
+    else:
+        return False
+
 def parse_signalp6_file(infile, outfile):
     out_handle = open(outfile, 'w')
     out_handle.write('\t'.join(['prot_ID', 'sp_type', 'none_prob', 'sp_prob', 'cs_pos', 'cs_pos_prob']) + '\n')
@@ -140,6 +157,14 @@ def process_signalp_file(in_file, ayu_outdir, keep_files = False):
 
 
 #IPC File
+def is_ipc2_in_path():
+    devnull = open(os.devnull, 'w')
+    proc = subprocess.run(['bash', '-c', 'type signalp6'], stdout=devnull, stderr=devnull)
+    if proc.returncode == 0:
+        return True
+    else:
+        return False
+
 def parse_ipc2_file(in_file, out_file):
     out_handle = open(out_file, 'w')
     out_handle.write('prot_ID\tpI\n')
