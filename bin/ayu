@@ -18,15 +18,15 @@ parser_preproc.add_argument('out_dir', help='Output directory')
 parser_preproc.add_argument('--threads', type=int, default=8, help='number of threads for features that allow multiprocessing (default=8)')
 
 parser_loadtmbed = subparser.add_parser('load_tmbed')
-parser_loadtmbed.add_argument('tmbed_file')
+parser_loadtmbed.add_argument('input_file')
 parser_loadtmbed.add_argument('out_dir')
 
 parser_loadsignalp = subparser.add_parser('load_signalp6')
-parser_loadsignalp.add_argument('signalp6_file')
+parser_loadsignalp.add_argument('input_file')
 parser_loadsignalp.add_argument('out_dir')
 
 parser_loadipc2 = subparser.add_parser('load_ipc2')
-parser_loadipc2.add_argument('ipc2_file')
+parser_loadipc2.add_argument('input_file')
 parser_loadipc2.add_argument('out_dir')
 
 
@@ -35,76 +35,29 @@ args = parser.parse_args()
 args.out_dir = args.out_dir.rstrip('/') + '/'
 
 ## HELP SCRIPTS
-def find_ayu_status_file(ayu_dir):
-    ayu_file_list = [x for x in os.listdir(ayu_dir) if x.split('.')[-1] == 'ayu']
-    if len(ayu_file_list) == 1:
-        return ayu_dir + ayu_file_list[0]
-    else:
-        return None
-
-def load_ayu_progress(progress_file):
-    progress_status_dict = None
-    with open(progress_file, 'rb') as in_handle:
-        progress_status_dict = pickle.load(in_handle)
-    return progress_status_dict
-
-def get_ayu_status():
-    ayu_status_file = find_ayu_status_file(args.out_dir)
-    if ayu_status_file is None:
-        print('Not able to find an ayu status file in folder {}. Please check the path and try again.')
-        return (None, None)
-    progress_status_dict = load_ayu_progress(ayu_status_file)
-    return (ayu_status_file, progress_status_dict)
-
-def save_ayu_progress(progress_file, progress_status_dict):
-    with open(progress_file, 'wb') as out_handle:
-        pickle.dump(progress_status_dict, out_handle)
-
-def remove_file(*files_to_remove):
-    for filename in files_to_remove:
-        try:
-            os.remove(filename)
-        except FileNotFoundError:
-            pass
-
 
 ## LOAD EXTERNAL FILES
-def load_tmbed_file(tmbed_input, check_completeness = False):
+def load_tmbed_file(tmbed_input):
 
-    ayu_status_file, progress_status_dict = get_ayu_status()
+    ayu_status_file, progress_status_dict = ayu.preprocessing.get_ayu_status(args.out_dir)
     if progress_status_dict is None: return None
 
     parsed_tmbed_file = ayu.ex_programs_processing.process_tmbed_file(tmbed_input, args.out_dir)
-    if progress_status_dict['tmbed_files'] is None:
-        progress_status_dict['tmbed_files'] = [parsed_tmbed_file]
-    else:
-        progress_status_dict['tmbed_files'].append(parsed_tmbed_file)
-    
-    save_ayu_progress(ayu_status_file, progress_status_dict)
+    ayu.ex_programs_processing.save_tmbed_file_in_ayu(parsed_tmbed_file, args.out_dir)
 
-def load_signalp_file(signalp_input, check_completeness = False):
-    ayu_status_file, progress_status_dict = get_ayu_status()
+def load_signalp6_file(signalp_input):
+    ayu_status_file, progress_status_dict = ayu.preprocessing.get_ayu_status(args.out_dir)
     if progress_status_dict is None: return None
 
-    parsed_signalp_file = ayu.ex_programs_processing.process_signalp_file(signalp_input, args.out_dir)
-    if progress_status_dict['signalp_files'] is None:
-        progress_status_dict['signalp_files'] = [parsed_signalp_file]
-    else:
-        progress_status_dict['signalp_files'].append(parsed_signalp_file)
-    
-    save_ayu_progress(ayu_status_file, progress_status_dict)
+    parsed_sp_file = ayu.ex_programs_processing.process_signalp6_file(signalp_input, args.out_dir)
+    ayu.ex_programs_processing.save_signalp6_file_in_ayu(parsed_sp_file, args.out_dir)
 
-def load_ipc2_file(ipc2_input, check_completeness = False):
-    ayu_status_file, progress_status_dict = get_ayu_status()
+def load_ipc2_file(ipc2_input):
+    ayu_status_file, progress_status_dict = ayu.preprocessing.get_ayu_status(args.out_dir)
     if progress_status_dict is None: return None
 
-    parsed_ipc2_file = ayu.ex_programs_processing.process_ipc2_file(ipc2_input, args.out_dir)
-    if progress_status_dict['ipc2_files'] is None:
-        progress_status_dict['ipc2_files'] = [parsed_ipc2_file]
-    else:
-        progress_status_dict['ipc2_files'].append(parsed_ipc2_file)
-    
-    save_ayu_progress(ayu_status_file, progress_status_dict)
+    parsed_pi_file = ayu.ex_programs_processing.process_signalp6_file(ipc2_input, args.out_dir)
+    ayu.ex_programs_processing.save_ipc2_file_in_ayu(parsed_pi_file, args.out_dir)
 
 def check_completeness(extr_type, out_file = None):
     #extr_type is one of 'tmbed_files', 'signalp_files', 'ipc2_files'. Has to be str
@@ -165,7 +118,7 @@ def run_preprocessing(progress_status_dict):
         ayu_preproc_fasta = args.out_dir + 'ayu.{}.preproc.faa'.format(os.getpid())
         ayu_preproc_rejected = args.out_dir + 'ayu.{}.preproc_rejected.txt'.format(os.getpid())
         progress_status_dict['prefilter'] = ayu.preprocessing.process_fasta_files(args.input_fasta, ayu_preproc_fasta, ayu_preproc_rejected)
-        save_ayu_progress(progress_status_file, progress_status_dict)
+        ayu.preprocessing.save_ayu_progress(progress_status_file, progress_status_dict)
     else:
         print('Loaded previous preprocessing')
 
@@ -175,19 +128,20 @@ def run_preprocessing(progress_status_dict):
         ayu_mapping = args.out_dir + 'ayu.{}.alias_mapping.tsv'.format(os.getpid())
         progress_status_dict['alias_fasta'], progress_status_dict['alias_mapping'] = ayu.preprocessing.give_aliases(
             progress_status_dict['prefilter'], ayu_alias_fasta_original, ayu_mapping)
-        save_ayu_progress(progress_status_file, progress_status_dict)
+        ayu.preprocessing.save_ayu_progress(progress_status_file, progress_status_dict)
         print('\tDone!')
     else:
         print('Loaded previous aliases')
 
-    if progress_status_dict['final_fasta_files'] is None:
+    if progress_status_dict['final_ayu_files'] is None:
         print('Dividing files into chunks...', end='')
         ayu_alias_fasta_prefix = args.out_dir + 'ayu.{}.alias'.format(os.getpid())
         ayu_fasta_file_list = ayu.preprocessing.divide_fasta_files(progress_status_dict['alias_fasta'], ayu_alias_fasta_prefix)
-        print('file divided into {} chunks'.format(len(ayu_fasta_file_list)))
-        progress_status_dict['final_fasta_files'] = {}
+        print('\tfile divided into {} chunks'.format(len(ayu_fasta_file_list)))
+        progress_status_dict['final_ayu_files'] = {}
         for file_name in ayu_fasta_file_list:
-            progress_status_dict['final_fasta_files'][file_name] = {
+            progress_status_dict['final_ayu_files'][file_name] = {
+                                                                'seq_set':None,
                                                                 'aa_counts':None,
                                                                 'ilr_aa_counts':None,
                                                                 'dp_counts':None,
@@ -197,12 +151,15 @@ def run_preprocessing(progress_status_dict):
                                                                 'ilr_pqso':None,
                                                                 'ppaac':None,
                                                                 'ilr_ppaac':None,
-                                                                'tmbed':None,
+                                                                'transmemb':None,
+                                                                'transmemb_set':set([]),
                                                                 'sp':None,
-                                                                'pi':None
+                                                                'sp_set':set([]),
+                                                                'pi':None,
+                                                                'pi_set':set([])
                                                                 }
-        remove_file(progress_status_dict['alias_fasta'])
-        save_ayu_progress(progress_status_file, progress_status_dict)
+        ayu.preprocessing.remove_file(progress_status_dict['alias_fasta'])
+        ayu.preprocessing.save_ayu_progress(progress_status_file, progress_status_dict)
     else:
         print('Loaded previous chunks')
     
@@ -210,110 +167,114 @@ def run_preprocessing(progress_status_dict):
 
 def run_aa_counts(progress_status_dict, ayu_fasta_file):
     ayu_file_prefix = '.'.join(ayu_fasta_file.split('.')[:-1])
-    if progress_status_dict['final_fasta_files'][ayu_fasta_file]['aa_counts'] is None:
+    if progress_status_dict['final_ayu_files'][ayu_fasta_file]['aa_counts'] is None:
         aa_counts_file = ayu_file_prefix + '.AA_counts.tsv'
         print('\tExtracting protein features (AA Counts)... ', end='')
-        progress_status_dict['final_fasta_files'][ayu_fasta_file]['aa_counts'] = ayu.protein_features.process_aa_counts(ayu_fasta_file, 
+        progress_status_dict['final_ayu_files'][ayu_fasta_file]['aa_counts'] = ayu.protein_features.process_aa_counts(ayu_fasta_file, 
             aa_counts_file, args.threads)
-        save_ayu_progress(progress_status_file, progress_status_dict)
+        ayu.preprocessing.save_ayu_progress(progress_status_file, progress_status_dict)
         print('\tDone!')
     else:
-        print('\tLoading AA Counts from {}'.format(progress_status_dict['final_fasta_files'][ayu_fasta_file]['aa_counts']))
+        print('\tLoading AA Counts from {}'.format(progress_status_dict['final_ayu_files'][ayu_fasta_file]['aa_counts']))
     
-    if progress_status_dict['final_fasta_files'][ayu_fasta_file]['ilr_aa_counts'] is None:
+    if progress_status_dict['final_ayu_files'][ayu_fasta_file]['ilr_aa_counts'] is None:
         print('\tClosure + ILR Conversion (AA Counts)...', end='')
-        aa_closure_file = progress_status_dict['final_fasta_files'][ayu_fasta_file]['aa_counts'] + '.CL'
-        aa_closure_file = ayu.ilr_conversion.process_file_parallel_closure(progress_status_dict['final_fasta_files'][ayu_fasta_file]['aa_counts'], 
+        aa_closure_file = progress_status_dict['final_ayu_files'][ayu_fasta_file]['aa_counts'] + '.CL'
+        aa_closure_file = ayu.ilr_conversion.process_file_parallel_closure(progress_status_dict['final_ayu_files'][ayu_fasta_file]['aa_counts'], 
                                                                            aa_closure_file, args.threads)
         aa_ilr_file = aa_closure_file + '.ILR'
-        progress_status_dict['final_fasta_files'][ayu_fasta_file]['ilr_aa_counts'] = ayu.ilr_conversion.process_file_parallel_ilr(aa_closure_file, aa_ilr_file, args.threads)
-        remove_file(progress_status_dict['final_fasta_files'][ayu_fasta_file]['aa_counts'], aa_closure_file)
-        save_ayu_progress(progress_status_file, progress_status_dict)
+        progress_status_dict['final_ayu_files'][ayu_fasta_file]['ilr_aa_counts'] = ayu.ilr_conversion.process_file_parallel_ilr(aa_closure_file, aa_ilr_file, args.threads)
+        ayu.preprocessing.remove_file(progress_status_dict['final_ayu_files'][ayu_fasta_file]['aa_counts'], aa_closure_file)
+        ayu.preprocessing.save_ayu_progress(progress_status_file, progress_status_dict)
         print('\tDone!')
     else:
-        print('\tLoading ILR-converted AA Counts from {}'.format(progress_status_dict['final_fasta_files'][ayu_fasta_file]['ilr_aa_counts']))
+        print('\tLoading ILR-converted AA Counts from {}'.format(progress_status_dict['final_ayu_files'][ayu_fasta_file]['ilr_aa_counts']))
 
 def run_dp_counts(progress_status_dict, ayu_fasta_file):
     ayu_file_prefix = '.'.join(ayu_fasta_file.split('.')[:-1])
-    if progress_status_dict['final_fasta_files'][ayu_fasta_file]['dp_counts'] is None:
+    if progress_status_dict['final_ayu_files'][ayu_fasta_file]['dp_counts'] is None:
         dp_counts_file = ayu_file_prefix + '.DP_counts.tsv'
         print('\tExtracting protein features (DP Counts)...', end='')
-        progress_status_dict['final_fasta_files'][ayu_fasta_file]['dp_counts'] = ayu.protein_features.process_dp_counts(ayu_fasta_file, 
+        progress_status_dict['final_ayu_files'][ayu_fasta_file]['dp_counts'] = ayu.protein_features.process_dp_counts(ayu_fasta_file, 
             dp_counts_file, args.threads)
-        save_ayu_progress(progress_status_file, progress_status_dict)
+        ayu.preprocessing.save_ayu_progress(progress_status_file, progress_status_dict)
         print('\tDone!')
     else:
-        print('\tLoading DP Counts from {}'.format(progress_status_dict['final_fasta_files'][ayu_fasta_file]['dp_counts']))
+        print('\tLoading DP Counts from {}'.format(progress_status_dict['final_ayu_files'][ayu_fasta_file]['dp_counts']))
 
-    if progress_status_dict['final_fasta_files'][ayu_fasta_file]['ilr_dp_counts'] is None:
+    if progress_status_dict['final_ayu_files'][ayu_fasta_file]['ilr_dp_counts'] is None:
         print('\tClosure + ILR Conversion (DP Counts)...', end='')
-        dp_closure_file = progress_status_dict['final_fasta_files'][ayu_fasta_file]['dp_counts'] + '.CL'
-        dp_comp_file = ayu.ilr_conversion.process_file_parallel_closure(progress_status_dict['final_fasta_files'][ayu_fasta_file]['dp_counts'], 
+        dp_closure_file = progress_status_dict['final_ayu_files'][ayu_fasta_file]['dp_counts'] + '.CL'
+        dp_comp_file = ayu.ilr_conversion.process_file_parallel_closure(progress_status_dict['final_ayu_files'][ayu_fasta_file]['dp_counts'], 
                                                                         dp_closure_file, args.threads)
         dp_ilr_file = dp_closure_file + '.ILR'
-        progress_status_dict['final_fasta_files'][ayu_fasta_file]['ilr_dp_counts'] = ayu.ilr_conversion.process_file_parallel_ilr(dp_closure_file, dp_ilr_file, args.threads)
-        remove_file(progress_status_dict['final_fasta_files'][ayu_fasta_file]['dp_counts'], dp_closure_file)
-        save_ayu_progress(progress_status_file, progress_status_dict)
+        progress_status_dict['final_ayu_files'][ayu_fasta_file]['ilr_dp_counts'] = ayu.ilr_conversion.process_file_parallel_ilr(dp_closure_file, dp_ilr_file, args.threads)
+        ayu.preprocessing.remove_file(progress_status_dict['final_ayu_files'][ayu_fasta_file]['dp_counts'], dp_closure_file)
+        ayu.preprocessing.save_ayu_progress(progress_status_file, progress_status_dict)
         print('\tDone!')
     else:
-        print('\tLoading ILR-converted DP Counts from {}'.format(progress_status_dict['final_fasta_files'][ayu_fasta_file]['ilr_dp_counts']))
+        print('\tLoading ILR-converted DP Counts from {}'.format(progress_status_dict['final_ayu_files'][ayu_fasta_file]['ilr_dp_counts']))
 
 def run_prot_costs(progress_status_dict, ayu_fasta_file):
     ayu_file_prefix = '.'.join(ayu_fasta_file.split('.')[:-1])
-    if progress_status_dict['final_fasta_files'][ayu_fasta_file]['protein_costs'] is None:
+    if progress_status_dict['final_ayu_files'][ayu_fasta_file]['protein_costs'] is None:
         protein_costs_file = ayu_file_prefix + '.prot_costs.tsv'
         print('\tExtracting protein features (Protein costs)...', end='')
-        progress_status_dict['final_fasta_files'][ayu_fasta_file]['protein_costs'] = ayu.protein_features.process_protein_costs(ayu_fasta_file, protein_costs_file, args.threads)
-        save_ayu_progress(progress_status_file, progress_status_dict)
+        progress_status_dict['final_ayu_files'][ayu_fasta_file]['protein_costs'] = ayu.protein_features.process_protein_costs(ayu_fasta_file, protein_costs_file, args.threads)
+        ayu.preprocessing.save_ayu_progress(progress_status_file, progress_status_dict)
         print('\tDone!')
     else:
-        print('Loading protein costs file from {}'.format(progress_status_dict['final_fasta_files'][ayu_fasta_file]['protein_costs']))
+        print('\tLoading protein costs file from {}'.format(progress_status_dict['final_ayu_files'][ayu_fasta_file]['protein_costs']))
 
 def run_pqso(progress_status_dict, ayu_fasta_file):
     ayu_file_prefix = '.'.join(ayu_fasta_file.split('.')[:-1])
-    if progress_status_dict['final_fasta_files'][ayu_fasta_file]['pqso'] is None:
+    if progress_status_dict['final_ayu_files'][ayu_fasta_file]['pqso'] is None:
         pqso_file = ayu_file_prefix + '.pQSO.tsv'
         print('\tExtracting protein features (Partial QSO)...', end='')
-        progress_status_dict['final_fasta_files'][ayu_fasta_file]['pqso'] = ayu.protein_features.process_pqso(ayu_fasta_file, pqso_file, args.threads, 20)
-        save_ayu_progress(progress_status_file, progress_status_dict)
+        progress_status_dict['final_ayu_files'][ayu_fasta_file]['pqso'] = ayu.protein_features.process_pqso(ayu_fasta_file, pqso_file, args.threads, 20)
+        ayu.preprocessing.save_ayu_progress(progress_status_file, progress_status_dict)
         print('\tDone!')
     else:
-        print('Loading pQSO file from {}'.format(progress_status_dict['final_fasta_files'][ayu_fasta_file]['pqso']))
+        print('\tLoading pQSO file from {}'.format(progress_status_dict['final_ayu_files'][ayu_fasta_file]['pqso']))
     
-    if progress_status_dict['final_fasta_files'][ayu_fasta_file]['ilr_pqso'] is None:
+    if progress_status_dict['final_ayu_files'][ayu_fasta_file]['ilr_pqso'] is None:
         print('\tClosure + ILR Conversion for partial QSO...', end='')
-        pqso_closure_file = progress_status_dict['final_fasta_files'][ayu_fasta_file]['pqso'] + '.CL'
-        pqso_closure_file = ayu.ilr_conversion.process_file_parallel_closure(progress_status_dict['final_fasta_files'][ayu_fasta_file]['pqso'], 
+        pqso_closure_file = progress_status_dict['final_ayu_files'][ayu_fasta_file]['pqso'] + '.CL'
+        pqso_closure_file = ayu.ilr_conversion.process_file_parallel_closure(progress_status_dict['final_ayu_files'][ayu_fasta_file]['pqso'], 
                                                                               pqso_closure_file, args.threads)
         pqso_ilr_file = pqso_closure_file + '.ILR'
-        progress_status_dict['final_fasta_files'][ayu_fasta_file]['ilr_pqso'] = ayu.ilr_conversion.process_file_parallel_ilr(pqso_closure_file, 
+        progress_status_dict['final_ayu_files'][ayu_fasta_file]['ilr_pqso'] = ayu.ilr_conversion.process_file_parallel_ilr(pqso_closure_file, 
                                                                                 pqso_ilr_file, args.threads)
-        remove_file(progress_status_dict['final_fasta_files'][ayu_fasta_file]['pqso'], pqso_closure_file)
-        save_ayu_progress(progress_status_file, progress_status_dict)
+        ayu.preprocessing.remove_file(progress_status_dict['final_ayu_files'][ayu_fasta_file]['pqso'], pqso_closure_file)
+        ayu.preprocessing.save_ayu_progress(progress_status_file, progress_status_dict)
         print('\tDone!')
     else:
-        print('Loading ILR-converted pQSO file from {}'.format(progress_status_dict['final_fasta_files'][ayu_fasta_file]['pqso']))
+        print('\tLoading ILR-converted pQSO file from {}'.format(progress_status_dict['final_ayu_files'][ayu_fasta_file]['ilr_pqso']))
 
 def run_ppaac(progress_status_dict, ayu_fasta_file):
     ayu_file_prefix = '.'.join(ayu_fasta_file.split('.')[:-1])
-    if progress_status_dict['final_fasta_files'][ayu_fasta_file]['ppaac'] is None:
+    if progress_status_dict['final_ayu_files'][ayu_fasta_file]['ppaac'] is None:
         ppaac_file = ayu_file_prefix + '.pPAAC.tsv'
         print('\tExtracting protein features (Partial PAAC)...', end='')
-        progress_status_dict['final_fasta_files'][ayu_fasta_file]['ppaac'] = ayu.protein_features.process_ppaac(ayu_fasta_file, 
+        progress_status_dict['final_ayu_files'][ayu_fasta_file]['ppaac'] = ayu.protein_features.process_ppaac(ayu_fasta_file, 
                                                                                                                 ppaac_file, args.threads, 20)
-        save_ayu_progress(progress_status_file, progress_status_dict)
+        ayu.preprocessing.save_ayu_progress(progress_status_file, progress_status_dict)
         print('\tDone!')
+    else:
+        print('\tLoading pPAAC file from {}'.format(progress_status_dict['final_ayu_files'][ayu_fasta_file]['ppaac']))
 
-    if progress_status_dict['final_fasta_files'][ayu_fasta_file]['ppaac_ilr'] is None:
+    if progress_status_dict['final_ayu_files'][ayu_fasta_file]['ilr_ppaac'] is None:
         print('\tClosure + ILR Conversion for partial PAAC...', end='')
-        ppaac_closure_file = progress_status_dict['final_fasta_files'][ayu_fasta_file]['ppaac'] + '.CL'
-        ppaac_closure_file = ayu.ilr_conversion.process_file_parallel_closure(progress_status_dict['final_fasta_files'][ayu_fasta_file]['ppaac'],
+        ppaac_closure_file = progress_status_dict['final_ayu_files'][ayu_fasta_file]['ppaac'] + '.CL'
+        ppaac_closure_file = ayu.ilr_conversion.process_file_parallel_closure(progress_status_dict['final_ayu_files'][ayu_fasta_file]['ppaac'],
                                                                             ppaac_closure_file, args.threads)
         ppaac_ilr_file = ppaac_closure_file + '.ILR'
-        progress_status_dict['final_fasta_files'][ayu_fasta_file]['ppaac_ilr'] = ayu.ilr_conversion.process_file_parallel_ilr(ppaac_closure_file, ppaac_ilr_file, args.threads)
-        remove_file(ppaac_file, ppaac_closure_file)
-        save_ayu_progress(progress_status_file, progress_status_dict)
+        progress_status_dict['final_ayu_files'][ayu_fasta_file]['ilr_ppaac'] = ayu.ilr_conversion.process_file_parallel_ilr(ppaac_closure_file, ppaac_ilr_file, args.threads)
+        ayu.preprocessing.remove_file(progress_status_dict['final_ayu_files'][ayu_fasta_file]['ppaac'], ppaac_closure_file)
+        ayu.preprocessing.save_ayu_progress(progress_status_file, progress_status_dict)
         print('\tDone!')
+    else:
+        print('\tLoading ILR-converted pQSO file from {}'.format(progress_status_dict['final_ayu_files'][ayu_fasta_file]['ilr_pqso']))
 
 
 if args.operation == 'preprocess':
@@ -321,34 +282,38 @@ if args.operation == 'preprocess':
     progress_status_dict = {'prefilter':None,
                        'alias_fasta':None,
                        'alias_mapping':None,
-                       'final_fasta_files':None,
-                       'seq_set':None,
-                       'tmbed_files':None,
-                       'signalp_files':None,
-                       'ipc2_files':None
+                       'final_ayu_files':None,
                        }
     
     # If there is no project directory, create one
     if not os.path.isdir(args.out_dir):
         os.mkdir(args.out_dir)
         progress_status_file = args.out_dir + 'ayu.{}.status.ayu'.format(os.getpid())
-        save_ayu_progress(progress_status_file, progress_status_dict)
+        ayu.preprocessing.save_ayu_progress(progress_status_file, progress_status_dict)
     else:
-        progress_status_file, progress_status_dict = get_ayu_status()
+        progress_status_file, progress_status_dict = ayu.preprocessing.get_ayu_status(args.out_dir)
     
     run_preprocessing(progress_status_dict)
 
-    for ayu_fasta_file in progress_status_dict['final_fasta_files']:
+    for ayu_fasta_file in progress_status_dict['final_ayu_files']:
         print('Processing fasta file {}...'.format(ayu_fasta_file))
-        run_aa_counts(progress_status_dict, ayu_fasta_file)
-        run_dp_counts(progress_status_dict, ayu_fasta_file)
-        run_prot_costs(progress_status_dict, ayu_fasta_file)
+        #run_aa_counts(progress_status_dict, ayu_fasta_file)
+        #run_dp_counts(progress_status_dict, ayu_fasta_file)
+        #run_prot_costs(progress_status_dict, ayu_fasta_file)
         run_pqso(progress_status_dict, ayu_fasta_file)
         run_ppaac(progress_status_dict, ayu_fasta_file)
 
- 
-    
-    
+        print('Preprocessing finished.')
+
+if args.operation == 'load_tmbed':
+    load_tmbed_file(args.input_file)
+
+if args.operation == 'load_signalp6':
+    load_signalp6_file(args.input_file)
+
+if args.operation == 'load_ipc2':
+    load_ipc2_file(args.input_file)
+
 
     
 

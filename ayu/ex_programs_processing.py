@@ -69,12 +69,10 @@ def add_slr_to_tmbed(tmbed_file, out_file):
     return out_file
 
 def process_tmbed_file(tmbed_file, ayu_outdir, keep_files = False):
-    
-
     tmbed_comp_file = ayu_outdir +  'ayu.{}.tmbed_comp.tsv'.format(os.getpid())
     tmbed_slr_file = ayu_outdir +  'ayu.{}.tmbed_slr.tsv'.format(os.getpid())
+    #Parse TMBed output
     master_tmbed_record_list = parse_tmbed_file(tmbed_file)
-    
     with open(tmbed_comp_file, 'w') as out_handle:
         result_header = None
         for finished_dict in get_avg_values(master_tmbed_record_list):
@@ -82,13 +80,40 @@ def process_tmbed_file(tmbed_file, ayu_outdir, keep_files = False):
                 result_header = list(finished_dict.keys())
                 out_handle.write('\t'.join(result_header) + '\n')
             out_handle.write('\t'.join([str(finished_dict[y]) for y in result_header]) + '\n')
+    # Parse into SLR
     tmbed_slr_file = add_slr_to_tmbed(tmbed_comp_file, tmbed_slr_file)
+    
+    # Add aliases if neccessary
+    tmbed_slr_file = ayu.preprocessing.check_for_aliases(tmbed_slr_file, ayu_outdir)
     
     if not keep_files:
         os.remove(tmbed_comp_file)
-    
     return tmbed_slr_file
 
+def save_tmbed_file_in_ayu(tmbed_file, ayu_outdir):
+    ayu_status_file, ayu_dict = ayu.preprocessing.get_ayu_status(ayu_outdir)
+    
+    tmbed_df = pd.read_csv(tmbed_file, sep = '\t')
+    tmbed_seq_set = set(tmbed_df['prot_ID'].to_list())
+    for ayu_file in ayu_dict['final_ayu_files']:
+        intersection_tmbed = tmbed_seq_set.intersection(ayu_dict['final_ayu_files'][ayu_file]['seq_set'])
+        if len(intersection_tmbed) == 0: continue
+        already_loaded = intersection_tmbed.intersection(ayu_dict['final_ayu_files'][ayu_file]['transmemb_set'])
+        if len(already_loaded) == len(intersection_tmbed): continue
+            
+        result_tm = tmbed_df[tmbed_df['prot_ID'].isin(intersection_tmbed - already_loaded)]
+        if ayu_dict['final_ayu_files'][ayu_file]['transmemb'] is None:
+            ayu_transmemb_file = '.'.join(ayu_file.split('.')[:-1]) + '.TM'
+            result_tm.to_csv(ayu_transmemb_file, sep='\t', index=False)
+            ayu_dict['final_ayu_files'][ayu_file]['transmemb'] = ayu_transmemb_file
+            ayu_dict['final_ayu_files'][ayu_file]['transmemb_set'] = ayu_dict['final_ayu_files'][ayu_file]['transmemb_set'].union(intersection_tmbed - already_loaded)
+        else:
+            ayu_transmemb_df = pd.read_csv(ayu_dict['final_ayu_files'][ayu_file]['transmemb'], sep = '\t')
+            ayu_transmemb_df = pd.concat(ayu_transmemb_df, result_tm)
+            ayu_transmemb_df.to_csv(ayu_transmemb_file, sep = '\t', index=False)
+            ayu_dict['final_ayu_files'][ayu_file]['transmemb_set'] = ayu_dict['final_ayu_files'][ayu_file]['transmemb_set'].union(intersection_tmbed - already_loaded)
+    ayu.preprocessing.remove_file(tmbed_file)
+    ayu.preprocessing.save_ayu_progress(ayu_status_file, ayu_dict)
 
 #SignalP6
 def is_signalp_in_path():
@@ -149,12 +174,43 @@ def signalp6_logit_transform(in_file, out_file):
 def process_signalp_file(in_file, ayu_outdir, keep_files = False):
     signalp_proc_file = ayu_outdir + 'ayu.{}.signalp6.tsv'
     signalp_logit_file = ayu_outdir + 'ayu.{}.signalp6_logit.tsv'
+    # Parse raw SignalP6 file
     signalp_proc_file = parse_signalp6_file(in_file)
+    # Transform files
     signalp_logit_file = signalp6_logit_transform(signalp_proc_file, signalp_logit_file)
+    # Add aliases if neccessary
+    signalp_logit_file = ayu.preprocessing.check_for_aliases(signalp_logit_file, ayu_outdir)
+    
     if not keep_files:
         os.remove(signalp_proc_file)
+
     return signalp_logit_file
 
+def save_signalp_file_in_ayu(sp_file, ayu_outdir):
+    ayu_status_file, ayu_dict = ayu.preprocessing.get_ayu_status(ayu_outdir)
+    
+    sp_df = pd.read_csv(sp_file, sep = '\t')
+    sp_seq_set = set(sp_df['prot_ID'].to_list())
+    for ayu_file in ayu_dict['final_ayu_files']:
+        intersection_sp = sp_seq_set.intersection(ayu_dict['final_ayu_files'][ayu_file]['seq_set'])
+        if len(intersection_sp) == 0: continue
+        already_loaded = intersection_sp.intersection(ayu_dict['final_ayu_files'][ayu_file]['sp_set'])
+        if len(already_loaded) == len(intersection_sp): continue
+        
+        rows_to_add = intersection_sp - already_loaded
+        result_tm = sp_df[sp_df['prot_ID'].isin(rows_to_add)]
+        if ayu_dict['final_ayu_files'][ayu_file]['sp'] is None:
+            ayu_sp_file = '.'.join(ayu_file.split('.')[:-1]) + '.SP'
+            result_tm.to_csv(ayu_sp_file, sep='\t', index=False)
+            ayu_dict['final_ayu_files'][ayu_file]['sp'] = ayu_sp_file
+            ayu_dict['final_ayu_files'][ayu_file]['sp_set'] = ayu_dict['final_ayu_files'][ayu_file]['sp_set'].union(rows_to_add)
+        else:
+            ayu_sp_df = pd.read_csv(ayu_dict['final_ayu_files'][ayu_file]['sp'], sep = '\t')
+            ayu_sp_df = pd.concat(ayu_sp_df, result_tm)
+            ayu_sp_df.to_csv(ayu_sp_file, sep = '\t', index=False)
+            ayu_dict['final_ayu_files'][ayu_file]['sp_set'] = ayu_dict['final_ayu_files'][ayu_file]['sp_set'].union(rows_to_add)
+    ayu.preprocessing.remove_file(sp_file)
+    ayu.preprocessing.save_ayu_progress(ayu_status_file, ayu_dict)
 
 #IPC File
 def is_ipc2_in_path():
@@ -179,8 +235,35 @@ def parse_ipc2_file(in_file, out_file):
 def process_ipc2_file(in_file, ayu_outdir):
     ipc2_file = ayu_outdir + 'ayu.{}.ipc2.tsv'
     ipc2_file = parse_ipc2_file(in_file, ipc2_file)
+    # Add aliases if neccessary
+    ipc2_file = ayu.preprocessing.check_for_aliases(ipc2_file, ayu_outdir)
     return ipc2_file
 
+def save_ipc2_file_in_ayu(ipc2_file, ayu_outdir):
+    ayu_status_file, ayu_dict = ayu.preprocessing.get_ayu_status(ayu_outdir)
+    
+    pi_df = pd.read_csv(ipc2_file, sep = '\t')
+    pi_df_set = set(pi_df['prot_ID'].to_list())
+    for ayu_file in ayu_dict['final_ayu_files']:
+        intersection_pi = pi_df_set.intersection(ayu_dict['final_ayu_files'][ayu_file]['seq_set'])
+        if len(intersection_pi) == 0: continue
+        already_loaded = intersection_pi.intersection(ayu_dict['final_ayu_files'][ayu_file]['pi_set'])
+        if len(already_loaded) == len(intersection_pi): continue
+        
+        rows_to_add = intersection_pi - already_loaded
+        result_pi = pi_df[pi_df['prot_ID'].isin(rows_to_add)]
+        if ayu_dict['final_ayu_files'][ayu_file]['pi'] is None:
+            ayu_pi_file = '.'.join(ayu_file.split('.')[:-1]) + '.PI'
+            result_pi.to_csv(ayu_pi_file, sep='\t', index=False)
+            ayu_dict['final_ayu_files'][ayu_file]['pi'] = ayu_pi_file
+            ayu_dict['final_ayu_files'][ayu_file]['pi_set'] = ayu_dict['final_ayu_files'][ayu_file]['pi_set'].union(rows_to_add)
+        else:
+            ayu_pi_df = pd.read_csv(ayu_dict['final_ayu_files'][ayu_file]['pi'], sep = '\t')
+            ayu_pi_df = pd.concat(ayu_pi_df, result_pi)
+            ayu_pi_df.to_csv(ayu_pi_file, sep = '\t', index=False)
+            ayu_dict['final_ayu_files'][ayu_file]['pi_set'] = ayu_dict['final_ayu_files'][ayu_file]['pi_set'].union(rows_to_add)
+    ayu.preprocessing.remove_file(ipc2_file)
+    ayu.preprocessing.save_ayu_progress(ayu_status_file, ayu_dict)
 
 '''
 def logit_func(x):

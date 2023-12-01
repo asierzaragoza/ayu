@@ -6,7 +6,9 @@
 - [Requirements](#requirements)
 - [Installation](#documentation)
 - [Usage](#usage)
-- [Running SignalP6 and TMBed separately](#running-signalp6-and-tmbed-separately)
+- [Preprocessing](#preprocessing)
+- [Running external programs: SignalP6, TMBed, IPC2](#running-external-programs-signalp6-tmbed-ipc2)
+- [Prediction](#prediction)
 - [Prediction output](#prediction-output)
 - [Citation](#citation)
 - [License](#license)
@@ -22,7 +24,9 @@ Ayu requires both [SignalP6.0](https://github.com/fteufel/signalp-6.0) and [TMBe
 
 # Usage
 
-## Running SignalP6, TMBed and IPC2 separately
+## Preprocessing
+
+## Running external programs: SignalP6, TMBed, IPC2
 Prediction of signal peptide and transmembrane regions is the most time- and resource-consuming step of the process. Therefore, some users might prefer to run TMBed and SignalP6 separately (or in a computer cluster) in order to speed up the prediction.
 
 ### SignalP6.0
@@ -57,6 +61,8 @@ The resulting file <output_ipc2_file> can be loaded into ayu with the command:
 ```
 ayu load_ipc2 <output_ipc2_file> <ayu_project_dir>
 ```
+
+## Prediction
 
 # Prediction output
 

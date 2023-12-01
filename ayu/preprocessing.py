@@ -1,5 +1,7 @@
 from Bio.SeqIO.FastaIO import SimpleFastaParser
 import os
+import pandas as pd
+import pickle
 
 # Get sequences
 # give them an appropiate name, store old sequence names
@@ -9,6 +11,14 @@ import os
 # check for repeated sequence names
 
 std_aa_set = set("ARNDCEQGHILKMFPSTWYV")
+
+def remove_file(*files_to_remove):
+    for filename in files_to_remove:
+        try:
+            os.remove(filename)
+        except FileNotFoundError:
+            pass
+
 
 def process_fasta_files(file_name, out_file, rejected_file):
     out_handle = open(out_file, 'w')
@@ -91,16 +101,109 @@ def divide_fasta_files(file_name, out_file_prefix, max_aa_size = 100000000):
     
     return divided_files_list
 
+def check_for_aliases(file_name, ayu_outdir, force_alias_change = True):
+    #load alias file
+    ayu_status_file, progress_status_dict = get_ayu_status(ayu_outdir)
+    alias_file = progress_status_dict['alias_mapping']
+    alias_dict = {}
+    alias_set = ([])
+    with open(alias_file) as in_handle:
+        for line in in_handle:
+            splitLine = line.rstrip('\n').split('\t')
+            alias_dict[splitLine[1]] = splitLine[0]
+            alias_set.add(splitLine[0])
+    
+    file_df = pd.read_csv(file_name, sep = '\t')
+    file_id_set = set(file_df['prot_ID'].to_list())
+    intersection_vs_original = file_id_set.intersection(set(alias_dict.keys()))
+    intersection_vs_aliases = file_id_set.intersection(alias_set)
 
+    if len(intersection_vs_aliases) == len(file_id_set):
+        print('No need for alias change')
+        return file_name
+    elif len(intersection_vs_original) == len(file_id_set):
+        print('All headers found in alias file')
+        file_df['prot_ID'] = file_df['prot_ID'].apply(lambda x: alias_dict[x])
+        file_df.to_csv(file_name + '.AL', sep = '\t', index=None)
+        remove_file(file_df)
+        return file_name + '.AL'
+    elif len(intersection_vs_original) > 0:
+        print('Some sequence IDs were not found in the alias file')
+        if force_alias_change:
+            file_df = file_df[file_df['prot_ID'].isin(intersection_vs_original)]
+            file_df['prot_ID'] = file_df['prot_ID'].apply(lambda x: alias_dict[x])
+            file_df.to_csv(file_name + '.AL', sep = '\t', index=None)
+            remove_file(file_df)
+            return file_name + '.AL'
+        else:
+            return None
+    else:
+        print('No sequence IDs were not found in the alias file')
+        return None
+    
+def find_ayu_status_file(ayu_outdir):
+    ayu_file_list = [x for x in os.listdir(ayu_outdir) if x.split('.')[-1] == 'ayu']
+    if len(ayu_file_list) == 1:
+        return ayu_outdir + ayu_file_list[0]
+    else:
+        return None
 
-def check_tmbed_completeness():
-    pass
+def get_ayu_status(ayu_outdir):
+    ayu_status_file = find_ayu_status_file(ayu_outdir)
+    if ayu_status_file is None:
+        print('Not able to find an ayu status file in folder {}. Please check the path and try again.')
+        return (None, None)
+    progress_status_dict = load_ayu_progress(ayu_status_file)
+    return (ayu_status_file, progress_status_dict)
 
-def check_signalp_completeness():
-    pass
+def load_ayu_progress(progress_file):
+    progress_status_dict = None
+    with open(progress_file, 'rb') as in_handle:
+        progress_status_dict = pickle.load(in_handle)
+    return progress_status_dict
 
-def check_ipc2_completeness():
-    pass
+def save_ayu_progress(progress_file, progress_status_dict):
+    with open(progress_file, 'wb') as out_handle:
+        pickle.dump(progress_status_dict, out_handle)
+    
+
+def build_extr_df_for_merging(progress_status_dict, ayu_fasta_file, extr_type):
+    #type = tmbed, signalp6, ipc2
+    #get prot_ids from fasta_file to merge
+    fasta_id_set = set([])
+
+    ayu_file_prefix = '.'.join(ayu_fasta_file.split('.')[:-1])
+
+    extr_file_dict = {'tmbed':'raw_tmbed_files', 'signalp6':'raw_signalp_files', 'ipc2':'raw_ipc2_files'}
+
+    extr_file_list = progress_status_dict[extr_file_dict[extr_type]]
+    with open(ayu_fasta_file) as in_handle:
+        for id, seq in SimpleFastaParser(in_handle):
+            fasta_id_set.add(id)
+    
+    extr_df_list = []
+    for extr_file in extr_file_list:
+        extr_df = pd.read_csv(extr_file, sep = '\t')
+        extr_df = extr_df.loc[extr_df['prot_ID'].isin(fasta_id_set)]
+        extr_df_list.append(extr_df)
+    final_df = pd.concat(extr_df_list)
+
+    del extr_df_list
+
+    final_df.to_csv(ayu_file_prefix + '.{}.tsv'.format(extr_type), sep = '\t', index=False)
+    return ayu_file_prefix + '.{}.tsv'.format(extr_type)
+
 
 def merge_dfs(df_list):
-    pass
+    def merge_datasets(dp_file, cached_df):
+        dp_df = pd.read_csv(dp_file, sep = '\t', comment = '#')    
+        dp_df = dp_df.merge(cached_df, on='prot_ID', how='inner')
+        return dp_df
+    
+    first_df_file = df_list[0]
+    final_df = pd.read_csv(first_df_file, sep='\t')
+    for i in range(1, len(df_list)):
+        merge_datasets(df_list[i], final_df)
+    
+    return final_df
+
