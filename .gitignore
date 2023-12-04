@@ -40,3 +40,5 @@ Thumbs.db
 ###########
 *.egg-info/
 testdata/
+OM-RGC/
+extr_ayu/

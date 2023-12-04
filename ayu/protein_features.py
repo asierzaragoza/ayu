@@ -125,7 +125,6 @@ def get_pi_biopython(protseq):
 
     return pi_dict
 
-@profile
 def get_ppaac(prot_seq, max_lag):
     """Calculate partial Pseudo Amino Acid Composition (pPAAC).
     :param protseq: tuple (header, sequence), as returned by SimpleFastaParser.
@@ -150,7 +149,6 @@ def get_ppaac(prot_seq, max_lag):
     
     return result_dict
 
-@profile
 def get_pqso(prot_seq, max_lag):
     """Calculate partial Quasi Sequence Order (pQSO).
     :param protseq: tuple (header, sequence), as returned by SimpleFastaParser.

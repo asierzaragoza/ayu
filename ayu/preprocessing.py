@@ -106,17 +106,23 @@ def check_for_aliases(file_name, ayu_outdir, force_alias_change = True):
     ayu_status_file, progress_status_dict = get_ayu_status(ayu_outdir)
     alias_file = progress_status_dict['alias_mapping']
     alias_dict = {}
-    alias_set = ([])
+    alias_set = set([])
     with open(alias_file) as in_handle:
         for line in in_handle:
             splitLine = line.rstrip('\n').split('\t')
             alias_dict[splitLine[1]] = splitLine[0]
             alias_set.add(splitLine[0])
-    
     file_df = pd.read_csv(file_name, sep = '\t')
     file_id_set = set(file_df['prot_ID'].to_list())
     intersection_vs_original = file_id_set.intersection(set(alias_dict.keys()))
     intersection_vs_aliases = file_id_set.intersection(alias_set)
+    #load rejected
+    rejected_set = set([])
+    with open(progress_status_dict['rejected_preproc']) as in_handle:
+        in_handle.readline()
+        for line in in_handle:
+            splitLine = line.rstrip('\n').split('\t')
+            rejected_set.add(splitLine[0])
 
     if len(intersection_vs_aliases) == len(file_id_set):
         print('No need for alias change')
@@ -125,15 +131,17 @@ def check_for_aliases(file_name, ayu_outdir, force_alias_change = True):
         print('All headers found in alias file')
         file_df['prot_ID'] = file_df['prot_ID'].apply(lambda x: alias_dict[x])
         file_df.to_csv(file_name + '.AL', sep = '\t', index=None)
-        remove_file(file_df)
+        remove_file(file_name)
         return file_name + '.AL'
     elif len(intersection_vs_original) > 0:
-        print('Some sequence IDs were not found in the alias file')
+        non_found_seqs_wo_rejected = file_id_set - intersection_vs_original - rejected_set
+        if len(non_found_seqs_wo_rejected) > 0:
+            print('Some sequence IDs ({}) were not found in the alias file'.format(len(non_found_seqs_wo_rejected)))
         if force_alias_change:
             file_df = file_df[file_df['prot_ID'].isin(intersection_vs_original)]
             file_df['prot_ID'] = file_df['prot_ID'].apply(lambda x: alias_dict[x])
             file_df.to_csv(file_name + '.AL', sep = '\t', index=None)
-            remove_file(file_df)
+            remove_file(file_name)
             return file_name + '.AL'
         else:
             return None
@@ -165,7 +173,14 @@ def load_ayu_progress(progress_file):
 def save_ayu_progress(progress_file, progress_status_dict):
     with open(progress_file, 'wb') as out_handle:
         pickle.dump(progress_status_dict, out_handle)
-    
+
+def get_seq_set(fasta_file):
+    seq_set = set([])
+    with open(fasta_file) as in_handle:
+        for id, seq in SimpleFastaParser(in_handle):
+            seq_set.add(id)
+    return seq_set
+
 
 def build_extr_df_for_merging(progress_status_dict, ayu_fasta_file, extr_type):
     #type = tmbed, signalp6, ipc2
@@ -194,16 +209,34 @@ def build_extr_df_for_merging(progress_status_dict, ayu_fasta_file, extr_type):
     return ayu_file_prefix + '.{}.tsv'.format(extr_type)
 
 
-def merge_dfs(df_list):
-    def merge_datasets(dp_file, cached_df):
-        dp_df = pd.read_csv(dp_file, sep = '\t', comment = '#')    
-        dp_df = dp_df.merge(cached_df, on='prot_ID', how='inner')
-        return dp_df
+def merge_dfs(progress_status_dict):
+    def merge_datasets(final_df, file_to_merge):
+        dp_to_merge = pd.read_csv(file_to_merge, sep = '\t', comment = '#') 
+        df_to_merge_size = len(df_to_merge_size.index)
+        final_df_size = len(final_df.index)
+        if df_to_merge_size != final_df_size:
+            print('Some protein IDs are not represented in file {}'.format(file_to_merge))
+        final_df = final_df.merge(dp_to_merge, on='prot_ID', how='inner')
+        return final_df
     
-    first_df_file = df_list[0]
-    final_df = pd.read_csv(first_df_file, sep='\t')
-    for i in range(1, len(df_list)):
-        merge_datasets(df_list[i], final_df)
-    
-    return final_df
+    for fasta_file in progress_status_dict['final_ayu_files']:
+        file_dict = progress_status_dict['final_ayu_files'][fasta_file]
+        final_df = pd.read_csv(file_dict['ilr_aa_counts'], sep = '\t')
+
+        ayu_files_list = [
+            file_dict['ilr_dp_counts'],
+            file_dict['protein_costs'],
+            file_dict['ilr_pqso'],
+            file_dict['ilr_ppaac'],
+            file_dict['transmemb'],
+            file_dict['sp'],
+            file_dict['pi']
+        ]
+
+        for ayu_file in ayu_files_list:
+            merge_datasets(final_df, ayu_file)
+        
+        return final_df
+
+
 
