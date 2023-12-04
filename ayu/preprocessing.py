@@ -212,16 +212,16 @@ def build_extr_df_for_merging(progress_status_dict, ayu_fasta_file, extr_type):
 def merge_dfs(progress_status_dict):
     def merge_datasets(final_df, file_to_merge):
         dp_to_merge = pd.read_csv(file_to_merge, sep = '\t', comment = '#') 
-        df_to_merge_size = len(df_to_merge_size.index)
+        df_to_merge_size = len(dp_to_merge.index)
         final_df_size = len(final_df.index)
         if df_to_merge_size != final_df_size:
             print('Some protein IDs are not represented in file {}'.format(file_to_merge))
         final_df = final_df.merge(dp_to_merge, on='prot_ID', how='inner')
         return final_df
-    
+    result_list = []
     for fasta_file in progress_status_dict['final_ayu_files']:
         file_dict = progress_status_dict['final_ayu_files'][fasta_file]
-        final_df = pd.read_csv(file_dict['ilr_aa_counts'], sep = '\t')
+        final_df = pd.read_csv(file_dict['ilr_aa_counts'], sep = '\t', comment='#')
 
         ayu_files_list = [
             file_dict['ilr_dp_counts'],
@@ -233,10 +233,21 @@ def merge_dfs(progress_status_dict):
             file_dict['pi']
         ]
 
+        if None in ayu_files_list:
+            list_names = ['DP counts', 'Protein costs', 'pQSO', 'pPAAC', 'TMBed', 'SignalP6', 'pI']
+            indexes_w_none = [ayu_files_list.index(i) for i in list_names if i == None]
+            print('The following features are not present: {}. Please load the corresponding files and try again.'.format(
+                ';'.join([list_names[i] for i in indexes_w_none])))
+            return None
+
         for ayu_file in ayu_files_list:
-            merge_datasets(final_df, ayu_file)
+            final_df = merge_datasets(final_df, ayu_file)
         
-        return final_df
+        ayu_merged_file = '.'.join(fasta_file.split('.')[:-1]) + '.MRG'
+        final_df.to_csv(ayu_merged_file, sep = '\t', index=False)
+        result_list.append(ayu_merged_file)
+    return result_list
+
 
 
 

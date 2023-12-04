@@ -72,7 +72,6 @@ def add_slr_to_tmbed(tmbed_file, out_file):
     tmbed_closed['tmbed_slr'] = np.log((tmbed_closed['P_B'] + tmbed_closed['P_H']) / (tmbed_closed['P_S'] + tmbed_closed['P_i'] + tmbed_closed['P_o']))
     
     tmbed_closed = tmbed_closed[['prot_ID', 'tmbed_slr']]
-    print(tmbed_closed)
     tmbed_closed.to_csv(out_file, sep='\t', index=False)
     return out_file
 
@@ -112,13 +111,11 @@ def save_tmbed_file_in_ayu(tmbed_file, ayu_outdir):
         result_tm = tmbed_df[tmbed_df['prot_ID'].isin(intersection_tmbed - already_loaded)]
         ayu_transmemb_file = '.'.join(ayu_file.split('.')[:-1]) + '.TM'
         if ayu_dict['final_ayu_files'][ayu_file]['transmemb'] is None:
-            print(result_tm)
             result_tm.to_csv(ayu_transmemb_file, sep='\t', index=False)
             ayu_dict['final_ayu_files'][ayu_file]['transmemb'] = ayu_transmemb_file
             ayu_dict['final_ayu_files'][ayu_file]['transmemb_set'] = ayu_dict['final_ayu_files'][ayu_file]['transmemb_set'].union(intersection_tmbed - already_loaded)
         else:
             ayu_transmemb_df = pd.read_csv(ayu_dict['final_ayu_files'][ayu_file]['transmemb'], sep = '\t')
-            print(ayu_transmemb_df)
             ayu_transmemb_df = pd.concat([ayu_transmemb_df, result_tm])
             ayu_transmemb_df.to_csv(ayu_transmemb_file, sep = '\t', index=False)
             ayu_dict['final_ayu_files'][ayu_file]['transmemb_set'] = ayu_dict['final_ayu_files'][ayu_file]['transmemb_set'].union(intersection_tmbed - already_loaded)
