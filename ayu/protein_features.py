@@ -1,7 +1,6 @@
 from Bio.SeqIO.FastaIO import SimpleFastaParser
 from Bio.SeqUtils.IsoelectricPoint import IsoelectricPoint as IP
 
-import pkgutil
 import itertools
 import functools
 import json
@@ -9,12 +8,22 @@ import math
 import numpy as np
 import multiprocessing
 
+try:
+    from importlib import resources as impresources
+except ImportError:
+    # Try backported to PY<37 `importlib_resources`.
+    import importlib_resources as impresources
+
+from . import data
+
 
 #todo: Fix this! https://stackoverflow.com/questions/6028000/how-to-read-a-static-file-from-inside-a-python-package
 
-data_file = pkgutil.get_data(__name__, 'data/protein_scales.json')
+data_file = (impresources.files(data) / 'protein_scales.json')
 aa_alphabet = 'ACDEFGHIKLMNPQRSTVWY'
-aaindex_dict = json.loads(data_file)
+aaindex_dict = None
+with open(data_file) as in_handle:
+    aaindex_dict = json.load(in_handle)
 
 # AUXILIARY FUNCTIONS
 def calculate_substitution(sequence, aascales_dict):

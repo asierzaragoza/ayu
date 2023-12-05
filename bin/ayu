@@ -6,8 +6,10 @@ import pickle
 import pandas as pd
 import ayu.preprocessing
 import ayu.protein_features
+
 import ayu.ilr_conversion
 import ayu.ex_programs_processing
+import ayu.prediction
 
 
 parser = argparse.ArgumentParser()
@@ -321,4 +323,13 @@ if args.operation == 'load_ipc2':
 if args.operation == 'predict':
     ayu_status_file, progress_status_dict = ayu.preprocessing.get_ayu_status(args.out_dir)
     final_merged_df_list = ayu.preprocessing.merge_dfs(progress_status_dict)
+    print(final_merged_df_list)
+    
+    pred_models = ayu.prediction.load_predictor_models()
+    
+    for merged_df in final_merged_df_list:
+        pred_df = ayu.prediction.run_predictions(merged_df, pred_models)
+        ayu.prediction.save_prediction_file(pred_df, args.out_file)
+
+
 
