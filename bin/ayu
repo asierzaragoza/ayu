@@ -323,13 +323,13 @@ if args.operation == 'load_ipc2':
 if args.operation == 'predict':
     ayu_status_file, progress_status_dict = ayu.preprocessing.get_ayu_status(args.out_dir)
     final_merged_df_list = ayu.preprocessing.merge_dfs(progress_status_dict)
-    print(final_merged_df_list)
     
     pred_models = ayu.prediction.load_predictor_models()
-    
+    raw_pred_file = args.out_dir + 'ayu.raw_preds.{}.tsv'.format(os.getpid())
     for merged_df in final_merged_df_list:
         pred_df = ayu.prediction.run_predictions(merged_df, pred_models)
-        ayu.prediction.save_prediction_file(pred_df, args.out_file)
+        ayu.prediction.save_prediction_file(pred_df, raw_pred_file)
+    ayu.prediction.modify_prediction_file(raw_pred_file, progress_status_dict, args.out_file)
 
 
 

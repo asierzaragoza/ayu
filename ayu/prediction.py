@@ -57,3 +57,19 @@ def save_prediction_file(result_df, out_file):
     result_df = result_df.reindex(sorted(result_df.columns), axis=1)
     result_df.to_csv(out_file, mode='a', header=not os.path.exists(out_file), index=False, sep = '\t')
 
+def modify_prediction_file(input_file, progress_status_dict, output_file):
+    input_df = pd.read_csv(input_file, sep='\t')
+    input_df['peri'] = input_df['peri'] - input_df['extr']
+    input_df['peri'][input_df['peri'] < 0] = 0
+
+    alias_file = progress_status_dict['alias_mapping']
+    alias_dict = {}
+    with open(alias_file) as in_handle:
+        for line in in_handle:
+            splitLine = line.rstrip('\n').split('\t')
+            alias_dict[splitLine[0]] = splitLine[1]
+
+    input_df['prot_ID'] = input_df['prot_ID'].apply(lambda x: alias_dict[x])
+    input_df.to_csv(output_file, sep = '\t', index=False)
+    ayu.preprocessing.remove_file(input_file)
+    return output_file
