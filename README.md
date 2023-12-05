@@ -15,7 +15,7 @@
 
 
 # Overview
-``Ayu`` aims to provide fast, reliable
+``Ayu`` aims to provide fast, reliable predictions of subecullar locations for proteins coded by marine prokaryotes. It is bases in XGboost, using as features the presence - absence of a signal peptide, amino acid composition information and transmembrane domain regions.
 
 # Requirements
 Ayu requires both [SignalP6.0](https://github.com/fteufel/signalp-6.0) and [TMBed](https://github.com/BernhoferM/TMbed) to be installed in order to use the `easy-workflow` command. If SignalP and TMBed are going to be run separately (See [Running SignalP6 and TMBed separately](#running-signalp6-and-tmbed-separately)), this is not required.
