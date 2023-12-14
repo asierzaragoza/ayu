@@ -14,26 +14,26 @@ import ayu.prediction
 
 parser = argparse.ArgumentParser()
 subparser = parser.add_subparsers(dest='operation')
-parser_preproc = subparser.add_parser('preprocess')
+parser_preproc = subparser.add_parser('preprocess', help='Create an ayu folder and calculate internal protein features. Run this first!')
 parser_preproc.add_argument('input_fasta', help='Fasta file')
 parser_preproc.add_argument('out_dir', help='Output directory')
 parser_preproc.add_argument('--threads', type=int, default=8, help='number of threads for features that allow multiprocessing (default=8)')
 
-parser_loadtmbed = subparser.add_parser('load_tmbed')
-parser_loadtmbed.add_argument('input_file')
-parser_loadtmbed.add_argument('out_dir')
+parser_loadtmbed = subparser.add_parser('load_tmbed', help= 'Load TMBed data from an external file.')
+parser_loadtmbed.add_argument('input_file', help='TMBed file')
+parser_loadtmbed.add_argument('out_dir', help = 'Ayu project folder (created by "ayu preprocessing")')
 
-parser_loadsignalp = subparser.add_parser('load_signalp6')
-parser_loadsignalp.add_argument('input_file')
-parser_loadsignalp.add_argument('out_dir')
+parser_loadsignalp = subparser.add_parser('load_signalp6', help = 'Load SignalP6 data from an external file.')
+parser_loadsignalp.add_argument('input_file', help = 'SignalP6 file')
+parser_loadsignalp.add_argument('out_dir', help = 'Ayu project folder (created by "ayu preprocessing")')
 
-parser_loadipc2 = subparser.add_parser('load_ipc2')
-parser_loadipc2.add_argument('input_file')
-parser_loadipc2.add_argument('out_dir')
+parser_loadipc2 = subparser.add_parser('load_ipc2', help = 'Load IPC 2.0 data from an external file.')
+parser_loadipc2.add_argument('input_file', 'IPC 2.0 fasta file')
+parser_loadipc2.add_argument('out_dir', help = 'Ayu project folder (created by "ayu preprocessing")')
 
-parser_predict = subparser.add_parser('predict')
-parser_predict.add_argument('out_dir')
-parser_predict.add_argument('out_file')
+parser_predict = subparser.add_parser('predict', help = 'Predict subcellular localization.')
+parser_predict.add_argument('out_dir', help = 'Ayu project folder (created by "ayu preprocessing")')
+parser_predict.add_argument('out_file', help='Output TSV file')
 
 args = parser.parse_args()
 args.out_dir = args.out_dir.rstrip('/') + '/'

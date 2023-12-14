@@ -20,14 +20,51 @@
 # Requirements
 Ayu requires both [SignalP6.0](https://github.com/fteufel/signalp-6.0) and [TMBed](https://github.com/BernhoferM/TMbed) to be installed in order to use the `easy-workflow` command. If SignalP and TMBed are going to be run separately (See [Running SignalP6 and TMBed separately](#running-signalp6-and-tmbed-separately)), this is not required.
 
+The python libraries required are:
+```
+biopython
+pandas
+numpy
+scipy
+scikit-bio
+xgboost==1.7.6
+```
+
+
 # Installation
 
+First, clone the repository and move to that folder:
+```
+git clone https://github.com/asierzaragoza/ayu && cd ayu
+```
+
+Then install with:
+```
+pip3 install .
+```
+
 # Usage
+The program requires for prediction both internal (calculated by Ayu) and external (Calculated by other software) protein features.
 
 ## Preprocessing
 
+Internal protein features have to be processed first with the command:
+```
+ayu preprocessing <fasta-file> <ayu_project_dir>
+```
+This command will also create an ayu project folder, which will be used in all following steps.
+
+
 ## Running external programs: SignalP6, TMBed, IPC2
-Prediction of signal peptide and transmembrane regions is the most time- and resource-consuming step of the process. Therefore, some users might prefer to run TMBed and SignalP6 separately (or in a computer cluster) in order to speed up the prediction.
+
+Ayu provides a series of commands to run external programs. In order to use these commands, the program has to be in the $PATH or the path has to be provided by the ``--path`` flag:
+
+```
+ayu run_ipc2 <ayu_project_dir>
+ayu run_tmbed <ayu_project_dir>
+ayu run_signalp6 --path <path_to_signalp6_executable> <ayu_project_dir>
+```
+However, prediction of signal peptide and transmembrane regions is the most time- and resource-consuming step of the process. Therefore, some users might prefer to run TMBed and SignalP6 separately (or in a computer cluster) in order to speed up the prediction.
 
 ### SignalP6.0
 The SignalP 6.0 results for ayu can be obtained with the command:
@@ -63,8 +100,24 @@ ayu load_ipc2 <output_ipc2_file> <ayu_project_dir>
 ```
 
 ## Prediction
+Once all protein features have been processed, protein sublocations can be predicted with the command:
+```
+```
+By default, Ayu will only run predictions for proteins with all the features already processed. To check which proteins do not have all the features, run the command: 
+```
+ayu predict --check_features <ayu_project_dir> <prediction_tsv_file>
+```
+
+This will output into STDOUT which proteins do not have all the features present in the project.
 
 # Prediction output
+The TSV file contains 4 columns:
+[*] **prot_ID** protein header as found in the input fasta file.
+[*] **cyto**: probability that the protein is located in the cytoplasm (0-1)
+[*] **peri**: probability that the protein is located in the periplasm (0-1)
+[*] **extr**: probability that the protein is secreted to the extracellular milieu (0-1)
+
+Ayu does not provide a cut-off for predictions, but we recommend using a cut-off of at least 0.6.
 
 # Citation
 If you use this tool for your research, please cite:

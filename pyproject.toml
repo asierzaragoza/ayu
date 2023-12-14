@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = [
+  "ayu"
+]
+
+[project]
+name = "ayu"
+version = "1.0"
+authors = [
+  {name="Asier Zaragoza", email="asierzaragozasolas@gmail.com"},
+]
+description = "A package for predicting subcellular location for marine bacterial proteins."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "biopython",
+    "pandas",
+    "numpy",
+    "scipy",
+    "scikit-bio",
+    "xgboost==1.7.6"
+]
+
+[project.urls]
+Homepage = "https://github.com/asierzaragoza/ayu"
+Issues = "https://github.com/asierzaragoza/ayu/issues"
