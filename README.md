@@ -10,6 +10,7 @@
 - [Running external programs: SignalP6, TMBed, IPC2](#running-external-programs-signalp6-tmbed-ipc2)
 - [Prediction](#prediction)
 - [Prediction output](#prediction-output)
+- [Training and validation datasets] (#training-and-validation-datasets)
 - [Citation](#citation)
 - [License](#license)
 
@@ -119,8 +120,13 @@ The TSV file contains 4 columns:
 
 Ayu does not provide a cut-off for predictions, but we recommend using a cut-off of at least 0.6.
 
+
+# Training and validation datasets
+Uniprot IDs of the proteins used for the validation and prediction datasets are contained in the `eval_train_sets` folder.
+
 # Citation
 If you use this tool for your research, please cite:
+
 
 # License
 This work is covered under the **GNU General Public License**.
