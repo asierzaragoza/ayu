@@ -21,6 +21,36 @@ def is_tmbed_in_path():
     else:
         return False
 
+def run_tmbed(ayu_outdir, ayu_fasta_file_list, tmbed_path=None):
+    if tmbed_path is None and is_tmbed_in_path() == False:
+        print('TMBed was not found in $PATH. Please provide a path to the executable with --exec_path.')
+        return None
+    
+    for i, ayu_fasta_file in enumerate(ayu_fasta_file_list):
+        print('Running TMBed ({} / {})'.format(i, len(ayu_fasta_file_list)))
+        out_file = ayu_outdir + 'tmbed_raw_file.{}.{}.tmbed'
+        out_file_list = []
+        proc = None
+        if tmbed_path is None:
+            try:
+                proc = subprocess.run(['tmbed', 'predict', '-f', ayu_outdir + ayu_fasta_file, '-p', out_file, '--out-format=3'])
+            except:
+                print('File {} was not processed'.format(ayu_fasta_file))
+        else:
+            try:
+                proc = subprocess.run([tmbed_path, 'predict', '-f', ayu_outdir + ayu_fasta_file, '-p', out_file, '--out-format=3'])
+            except:
+                print('File {} was not processed'.format(ayu_fasta_file))
+            
+        if proc is not None:    
+            if proc.returncode == 0:
+                out_file_list.append(out_file)
+            else:
+                print('File {} was not processed'.format(ayu_fasta_file))
+    
+    return out_file_list
+
+
 def parse_tmbed_file(tmbed_file):
     '''PRD: Predicted type, the other keys are the prediction values for each type'''
     tmbed_master_list = []
@@ -160,6 +190,41 @@ def parse_signalp6_file(infile, outfile):
 
     return outfile
 
+def run_signalp6(ayu_outdir, signalp6_path=None):
+    ayu_status_file, ayu_dict = ayu.preprocessing.get_ayu_status(ayu_outdir)
+
+    if signalp6_path is None and is_signalp6_in_path() == False:
+        print('SignalP6 was not found in $PATH. Please provide a path to the executable with --exec_path.')
+        return None
+    
+    ayu_fasta_file_list = list(ayu_dict['final_ayu_files'].keys())
+    for i, ayu_fasta_file in enumerate(ayu_fasta_file_list):
+        print('Running SignalP6 ({} / {})'.format(i, len(ayu_fasta_file_list)))
+        out_file = ayu_outdir + 'signalp6_raw_file.{}.{}/'
+        out_file_list = []
+        proc = None
+        if signalp6_path is None:
+            try:
+                proc = subprocess.run(['signalp6', '--fastafile', ayu_outdir + ayu_fasta_file, '--output_dir', out_file, 
+                                       '--format', 'none', '--mode', 'fast'])
+            except:
+                print('File {} was not processed'.format(ayu_fasta_file))
+        else:
+            try:
+                proc = subprocess.run([signalp6_path, '--fastafile', ayu_outdir + ayu_fasta_file, '--output_dir', out_file, 
+                                       '--format', 'none', '--mode', 'fast'])
+            except:
+                print('File {} was not processed'.format(ayu_fasta_file))
+            
+        if proc is not None:    
+            if proc.returncode == 0:
+                out_file_list.append(out_file)
+            else:
+                print('File {} was not processed'.format(ayu_fasta_file))
+    
+    return out_file_list
+
+
 def signalp6_logit_transform(in_file, out_file):
     def logit_func(x):
         x['sp_prob_logit'] = scipy.special.logit(x['sp_prob'])
@@ -233,6 +298,39 @@ def is_ipc2_in_path():
     else:
         return False
 
+
+def run_ipc2(ayu_outdir, model_path, ipc2_path=None):
+    ayu_status_file, ayu_dict = ayu.preprocessing.get_ayu_status(ayu_outdir)
+
+    if ipc2_path is None and is_signalp6_in_path() == False:
+        print('IPC2 was not found in $PATH. Please provide a path to the executable with --exec_path.')
+        return None
+    
+    ayu_fasta_file_list = list(ayu_dict['final_ayu_files'].keys())
+    for i, ayu_fasta_file in enumerate(ayu_fasta_file_list):
+        print('Running IPC2 ({} / {})'.format(i, len(ayu_fasta_file_list)))
+        out_file = ayu_outdir + 'ipc2_raw_file.{}.{}.fasta'
+        out_file_list = []
+        proc = None
+        if ipc2_path is None:
+            try:
+                proc = subprocess.run(['ipc2_protein_svr_predictor.py', model_path, ayu_outdir + ayu_fasta_file, out_file])
+            except:
+                print('File {} was not processed'.format(ayu_fasta_file))
+        else:
+            try:
+                proc = subprocess.run([ipc2_path, model_path, ayu_outdir + ayu_fasta_file, out_file])
+            except:
+                print('File {} was not processed'.format(ayu_fasta_file))
+            
+        if proc is not None:    
+            if proc.returncode == 0:
+                out_file_list.append(out_file)
+            else:
+                print('File {} was not processed'.format(ayu_fasta_file))
+    
+    return out_file_list
+
 def parse_ipc2_file(in_file, out_file):
     out_handle = open(out_file, 'w')
     out_handle.write('prot_ID\tpI\n')
@@ -278,32 +376,7 @@ def save_ipc2_file_in_ayu(ipc2_file, ayu_outdir):
     ayu.preprocessing.remove_file(ipc2_file)
     ayu.preprocessing.save_ayu_progress(ayu_status_file, ayu_dict)
 
-'''
-def logit_func(x):
-    return pd.Series(sp_special.logit(x))
-def closure_func(x):
-    return pd.Series(skbio_comp.multiplicative_replacement(skbio_comp.closure(x)))
 
-    
-    
-tmbed_df.set_index('prot_ID', drop=True, inplace=True)
-tmbed_colnames = tmbed_df.columns.values
-tmbed_df2 = tmbed_df.apply(closure_func, axis=1)
-tmbed_df2.rename({k:v for k,v in zip(tmbed_df2.columns.values, tmbed_colnames)}, axis='columns', inplace=True)
-tmbed_df2.reset_index()                      
-tmbed_df['tmbed_slr'] = np.log((tmbed_df2['P_B'] + tmbed_df2['P_H']) / (tmbed_df2['P_S'] + tmbed_df2['P_i'] + tmbed_df2['P_o']))
-
-# https://stackoverflow.com/questions/43757977/replacing-values-greater-than-a-number-in-pandas-dataframe
-# Apply this so we can do the logit transformation
-# I should only apply logit transformation if I'm going to use this feature as an outcome. For this I don't give a shit, specially now
-signalp_df.drop(columns=['sp_type', 'cs_pos', 'cs_pos_prob'], inplace=True)
-signalp_df.set_index('prot_ID', inplace=True)
-all_df_values = sorted(list(set(itertools.chain.from_iterable(signalp_df.values.tolist()))))
-epsilon = (all_df_values[1]) / 2
-signalp_df[signalp_df == 0] = epsilon
-signalp_df[signalp_df >= 1] = 1-epsilon
-signalp_df = signalp_df.apply(logit_func, axis=1)
-'''
 
 
 

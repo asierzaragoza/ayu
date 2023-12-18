@@ -19,13 +19,26 @@ parser_preproc.add_argument('input_fasta', help='Fasta file')
 parser_preproc.add_argument('out_dir', help='Output directory')
 parser_preproc.add_argument('--threads', type=int, default=8, help='number of threads for features that allow multiprocessing (default=8)')
 
+parser_runtmbed = subparser.add_parser('run_tmbed', help='Run TMBed with sequences from the Ayu folder.')
+parser_runtmbed.add_argument('out_dir', help = 'Ayu project folder (created by "ayu preprocessing")')
+parser_runtmbed.add_argument('--tmbed_path', default=None, help='path to TMBed executable. e.g. "/home/usr/bin/tmbed"')
+
 parser_loadtmbed = subparser.add_parser('load_tmbed', help= 'Load TMBed data from an external file.')
 parser_loadtmbed.add_argument('input_file', help='TMBed file')
 parser_loadtmbed.add_argument('out_dir', help = 'Ayu project folder (created by "ayu preprocessing")')
 
+parser_runsignalp= subparser.add_parser('run_tmbed', help='Run SignalP6 with sequences from the Ayu folder.')
+parser_runsignalp.add_argument('out_dir', help = 'Ayu project folder (created by "ayu preprocessing")')
+parser_runsignalp.add_argument('--signalp6_path', default=None, help='path to SignalP6 executable. e.g. "/home/usr/bin/signalp6"')
+
 parser_loadsignalp = subparser.add_parser('load_signalp6', help = 'Load SignalP6 data from an external file.')
 parser_loadsignalp.add_argument('input_file', help = 'SignalP6 file')
 parser_loadsignalp.add_argument('out_dir', help = 'Ayu project folder (created by "ayu preprocessing")')
+
+parser_runipc2= subparser.add_parser('run_ipc2', help='Run IPC2 with sequences from the Ayu folder.')
+parser_runipc2.add_argument('out_dir', help = 'Ayu project folder (created by "ayu preprocessing")')
+parser_runipc2.add_argument('--ipc2_path', default=None, help='path to IPC2 executable. e.g. "/home/usr/bin/ipc2/ipc2_protein_svr_predictor.py"')
+parser_runipc2.add_argument('--model_path', required=True, help='path to IPC2 executable. e.g. "/home/usr/bin/ipc2/models/IPC2_protein_75_SVR_19.pickle"')
 
 parser_loadipc2 = subparser.add_parser('load_ipc2', help = 'Load IPC 2.0 data from an external file.')
 parser_loadipc2.add_argument('input_file', 'IPC 2.0 fasta file')
@@ -41,6 +54,18 @@ args.out_dir = args.out_dir.rstrip('/') + '/'
 ## HELP SCRIPTS
 
 ## LOAD EXTERNAL FILES
+
+def run_tmbed():
+    ayu_status_file, progress_status_dict = ayu.preprocessing.get_ayu_status(args.out_dir)
+    ayu_fasta_file_list = [x for x in progress_status_dict['final_ayu_files'] if progress_status_dict['final_ayu_files'][x]['transmemb'] == None]
+    tmbed_raw_file_list = ayu.ex_programs_processing.run_tmbed(args.out_dir, ayu_fasta_file_list, tmbed_path=args.tmbed_path)
+    for tmbed_raw_file in tmbed_raw_file_list:
+        parsed_tmbed_file = ayu.ex_programs_processing.process_tmbed_file(tmbed_raw_file, args.out_dir)
+        ayu.ex_programs_processing.save_tmbed_file_in_ayu(parsed_tmbed_file, args.out_dir)
+
+    if len(tmbed_raw_file_list) != len(ayu_fasta_file_list):
+        print('Some fasta files have not been processed. Please check the error log and run the command again.')
+
 def load_tmbed_file(tmbed_input):
     ayu_status_file, progress_status_dict = ayu.preprocessing.get_ayu_status(args.out_dir)
     if progress_status_dict is None: return None
@@ -48,12 +73,35 @@ def load_tmbed_file(tmbed_input):
     parsed_tmbed_file = ayu.ex_programs_processing.process_tmbed_file(tmbed_input, args.out_dir)
     ayu.ex_programs_processing.save_tmbed_file_in_ayu(parsed_tmbed_file, args.out_dir)
 
+def run_signalp6():
+    ayu_status_file, progress_status_dict = ayu.preprocessing.get_ayu_status(args.out_dir)
+    ayu_fasta_file_list = [x for x in progress_status_dict['final_ayu_files'] if progress_status_dict['final_ayu_files'][x]['sp'] == None]
+    signalp6_raw_file_list = ayu.ex_programs_processing.run_signalp6(args.out_dir, ayu_fasta_file_list, signalp6_path=args.signalp6_path)
+    for signalp6_raw_file in signalp6_raw_file_list:
+        parsed_signalp6_file = ayu.ex_programs_processing.process_signalp6_file(signalp6_raw_file, args.out_dir)
+        ayu.ex_programs_processing.save_signalp6_file_in_ayu(parsed_signalp6_file, args.out_dir)
+
+    if len(signalp6_raw_file_list) != len(ayu_fasta_file_list):
+        print('Some fasta files have not been processed. Please check the error log and run the command again.')
+
 def load_signalp6_file(signalp_input):
     ayu_status_file, progress_status_dict = ayu.preprocessing.get_ayu_status(args.out_dir)
     if progress_status_dict is None: return None
 
     parsed_sp_file = ayu.ex_programs_processing.process_signalp6_file(signalp_input, args.out_dir)
     ayu.ex_programs_processing.save_signalp6_file_in_ayu(parsed_sp_file, args.out_dir)
+
+def run_ipc2():
+    ayu_status_file, progress_status_dict = ayu.preprocessing.get_ayu_status(args.out_dir)
+    ayu_fasta_file_list = [x for x in progress_status_dict['final_ayu_files'] if progress_status_dict['final_ayu_files'][x]['pi'] == None]
+    ipc2_raw_file_list = ayu.ex_programs_processing.run_ipc2(args.out_dir, ayu_fasta_file_list, 
+                                                                 ipc2_path=args.ipc2_path, model_path=args.model_path)
+    for ipc2_raw_file in ipc2_raw_file_list:
+        parsed_ipc2_file = ayu.ex_programs_processing.process_ipc2_file(ipc2_raw_file, args.out_dir)
+        ayu.ex_programs_processing.save_ipc2_file_in_ayu(parsed_ipc2_file, args.out_dir)
+
+    if len(ipc2_raw_file_list) != len(ayu_fasta_file_list):
+        print('Some fasta files have not been processed. Please check the error log and run the command again.')
 
 def load_ipc2_file(ipc2_input):
     ayu_status_file, progress_status_dict = ayu.preprocessing.get_ayu_status(args.out_dir)
@@ -64,7 +112,7 @@ def load_ipc2_file(ipc2_input):
 
 def check_completeness(extr_type, out_file = None):
     #extr_type is one of 'tmbed_files', 'signalp_files', 'ipc2_files'. Has to be str
-    ayu_status_file, progress_status_dict = get_ayu_status()
+    ayu_status_file, progress_status_dict = ayu.preprocessing.get_ayu_status(args.out_dir)
     if progress_status_dict is None: return None
 
     extr_seq_set = set([])
@@ -85,7 +133,7 @@ def check_completeness(extr_type, out_file = None):
         return progress_status_dict['seq_set'] - extr_seq_set
 
 def check_for_alias(extr_file):
-    ayu_status_file, progress_status_dict = get_ayu_status()
+    ayu_status_file, progress_status_dict = ayu.preprocessing.get_ayu_status(args.out_dir)
     if progress_status_dict is None: return None
     alias_set = set([])
     alias_dict = {}
@@ -311,14 +359,25 @@ if args.operation == 'preprocess':
 
         print('Preprocessing finished.')
 
+if args.operation == 'run_tmbed':
+    run_tmbed()
+
 if args.operation == 'load_tmbed':
     load_tmbed_file(args.input_file)
+
+if args.operation == 'run_signalp6':
+    run_signalp6()
 
 if args.operation == 'load_signalp6':
     load_signalp6_file(args.input_file)
 
 if args.operation == 'load_ipc2':
     load_ipc2_file(args.input_file)
+
+if args.operation == 'run_ipc2':
+    run_ipc2()
+
+
 
 if args.operation == 'predict':
     ayu_status_file, progress_status_dict = ayu.preprocessing.get_ayu_status(args.out_dir)
