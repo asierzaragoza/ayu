@@ -126,6 +126,7 @@ Uniprot IDs of the proteins used for the validation and prediction datasets are 
 
 # Citation
 If you use this tool for your research, please cite:
+[A novel artificial intelligence tool for identification of extracellular proteins doubles current estimate of the marine secretome](https://www.researchsquare.com/article/rs-3585715/v1)
 
 
 # License
